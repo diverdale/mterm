@@ -86,7 +86,6 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 
 	case tea.WindowSizeMsg:
 		a.width, a.height = m.Width, m.Height
-		a.picker.setSize(m.Width, m.Height)
 		for _, t := range a.tabs {
 			t.resize(m.Width, m.Height)
 		}

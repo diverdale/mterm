@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"mterm/internal/config"
 	mssh "mterm/internal/ssh"
@@ -297,5 +298,24 @@ func TestAppSpinnerCounterAdvances(t *testing.T) {
 	app.update(tickMsg{})
 	if app.tickCount != before+1 {
 		t.Fatalf("tickCount = %d, want %d", app.tickCount, before+1)
+	}
+}
+
+func TestAppSessionViewIsFramed(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "h"}, 80, 24)}
+	app.active = 0
+	app.mode = modeSession
+
+	out := app.View()
+	lines := strings.Split(out, "\n")
+	if len(lines) != 24 {
+		t.Fatalf("framed session view has %d lines, want 24", len(lines))
+	}
+	for i, ln := range lines {
+		if w := lipgloss.Width(ln); w != 80 {
+			t.Fatalf("session view line %d width = %d, want 80", i, w)
+		}
 	}
 }
