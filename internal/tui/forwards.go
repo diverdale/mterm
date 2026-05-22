@@ -60,7 +60,8 @@ func (p *forwardsPanel) View() string {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("Port forwards — %s\n\n", p.host.Name))
 	if len(p.host.Forwards) == 0 {
-		b.WriteString(statusBar.Render("  (no forwards configured for this host)\n"))
+		b.WriteString(statusBar.Render("  (no forwards configured for this host)"))
+		b.WriteString("\n")
 	}
 	for i, f := range p.host.Forwards {
 		cursor := "  "

@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"mterm/internal/config"
 )
 
@@ -41,5 +43,69 @@ func TestForwardsPanelToggle(t *testing.T) {
 	panel.toggle(0)
 	if panel.enabled(0) {
 		t.Fatal("toggle must disable the forward")
+	}
+}
+
+func TestForwardsPanelEscEmitsClose(t *testing.T) {
+	panel := newForwardsPanel(config.Host{Name: "h"})
+	cmd := panel.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Fatal("Update(Esc) must return a non-nil Cmd")
+	}
+	msg := cmd()
+	if _, ok := msg.(forwardsClosedMsg); !ok {
+		t.Fatalf("Esc cmd must emit forwardsClosedMsg, got %T", msg)
+	}
+}
+
+func TestForwardsPanelViewEmptyDoesNotPanic(t *testing.T) {
+	panel := newForwardsPanel(config.Host{Name: "h"})
+	view := panel.View()
+	if view == "" {
+		t.Fatal("View() must return a non-empty string for a host with no forwards")
+	}
+}
+
+func TestForwardsPanelUpdateCursorAndToggle(t *testing.T) {
+	host := config.Host{
+		Name: "h",
+		Forwards: []config.Forward{
+			{Type: config.ForwardLocal, BindPort: 8080, DialAddr: "127.0.0.1", DialPort: 80},
+			{Type: config.ForwardRemote, BindPort: 9000, DialAddr: "127.0.0.1", DialPort: 3000},
+		},
+	}
+	panel := newForwardsPanel(host)
+
+	// Move cursor down to index 1.
+	panel.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if panel.cursor != 1 {
+		t.Fatalf("expected cursor 1 after first KeyDown, got %d", panel.cursor)
+	}
+
+	// Second KeyDown must clamp at 1 (only two forwards, max index is 1).
+	panel.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if panel.cursor != 1 {
+		t.Fatalf("expected cursor to clamp at 1, got %d", panel.cursor)
+	}
+
+	// Toggle the forward at cursor (index 1).
+	panel.Update(tea.KeyMsg{Type: tea.KeySpace})
+	if !panel.enabled(1) {
+		t.Fatal("forward at index 1 should be enabled after toggle")
+	}
+	if panel.enabled(0) {
+		t.Fatal("forward at index 0 should still be disabled")
+	}
+
+	// Move cursor back up to index 0.
+	panel.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if panel.cursor != 0 {
+		t.Fatalf("expected cursor 0 after KeyUp, got %d", panel.cursor)
+	}
+
+	// Second KeyUp must clamp at 0.
+	panel.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if panel.cursor != 0 {
+		t.Fatalf("expected cursor to clamp at 0, got %d", panel.cursor)
 	}
 }
