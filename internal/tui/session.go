@@ -25,15 +25,16 @@ const (
 	statusFailed
 )
 
-// status derives the tab's connection state. A live session is connected; a
-// tab whose reader goroutine has exited (the session ended or never connected)
-// is failed; otherwise it is still connecting.
+// status derives the tab's connection state. A tab whose reader goroutine has
+// exited is failed — an absorbing state, checked first, since the reader can
+// exit while sess is still set. Otherwise a live session is connected, and a
+// tab still being dialed is connecting.
 func (t *sessionTab) status() tabStatus {
-	if t.sess.Load() != nil {
-		return statusConnected
-	}
 	if t.ended.Load() {
 		return statusFailed
+	}
+	if t.sess.Load() != nil {
+		return statusConnected
 	}
 	return statusConnecting
 }

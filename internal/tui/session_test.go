@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"mterm/internal/config"
+	mssh "mterm/internal/ssh"
 )
 
 func TestSessionTabTitleUsesHostName(t *testing.T) {
@@ -37,6 +38,23 @@ func TestSessionTabStatus(t *testing.T) {
 	tab.ended.Store(true)
 	if got := tab.status(); got != statusFailed {
 		t.Fatalf("status after ended = %v, want statusFailed", got)
+	}
+
+	// A live (non-nil) session → connected.
+	tabC := newSessionTab(2, config.Host{Name: "h"}, 80, 24)
+	var liveSess mssh.Session // zero value; status() only nil-checks the pointer
+	tabC.sess.Store(&liveSess)
+	if got := tabC.status(); got != statusConnected {
+		t.Fatalf("status with live session = %v, want statusConnected", got)
+	}
+
+	// ended==true while sess is still set (the post-readLoop, pre-reap window)
+	// must report failed — ended is absorbing.
+	tabE := newSessionTab(3, config.Host{Name: "h"}, 80, 24)
+	tabE.sess.Store(&liveSess)
+	tabE.ended.Store(true)
+	if got := tabE.status(); got != statusFailed {
+		t.Fatalf("status ended+sess-set = %v, want statusFailed", got)
 	}
 }
 
