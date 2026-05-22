@@ -95,7 +95,8 @@ func (p *picker) Update(msg tea.KeyMsg) tea.Cmd {
 		p.moveCursor(1)
 	case tea.KeyBackspace:
 		if p.query != "" {
-			p.setQuery(p.query[:len(p.query)-1])
+			runes := []rune(p.query)
+			p.setQuery(string(runes[:len(runes)-1]))
 		}
 	case tea.KeyRunes, tea.KeySpace:
 		p.setQuery(p.query + string(msg.Runes))
@@ -110,6 +111,8 @@ func (p *picker) View() string {
 	v := p.visibleHosts()
 	if len(v) == 0 {
 		b.WriteString(statusBar.Render("  (no matching hosts)"))
+		b.WriteString("\n\n")
+		b.WriteString(statusBar.Render("  enter: connect   esc: back   ctrl-c: quit"))
 		return b.String()
 	}
 	lastGroup := "\x00"

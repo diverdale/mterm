@@ -3,6 +3,7 @@ package tui
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"mterm/internal/config"
 )
 
@@ -50,4 +51,74 @@ func names(hs []config.Host) []string {
 		out = append(out, h.Name)
 	}
 	return out
+}
+
+func TestPickerCursorWrapsAround(t *testing.T) {
+	p := newPicker(sampleHosts())
+	// cursor starts at 0 (prod-web)
+	p.moveCursor(-1)
+	h, ok := p.selected()
+	if !ok || h.Name != "lab-box" {
+		t.Fatalf("moveCursor(-1) from 0 = %v,%v; want lab-box,true", h.Name, ok)
+	}
+	p.moveCursor(1)
+	h, ok = p.selected()
+	if !ok || h.Name != "prod-web" {
+		t.Fatalf("moveCursor(1) from last = %v,%v; want prod-web,true", h.Name, ok)
+	}
+}
+
+func TestPickerUpdateKeyDispatch(t *testing.T) {
+	p := newPicker(sampleHosts())
+
+	// KeyDown moves cursor to second host
+	p.Update(tea.KeyMsg{Type: tea.KeyDown})
+	h, ok := p.selected()
+	if !ok || h.Name != "prod-db" {
+		t.Fatalf("after KeyDown selected = %v,%v; want prod-db,true", h.Name, ok)
+	}
+
+	// KeyEnter returns a command that emits pickerChosenMsg
+	cmd := p.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("KeyEnter returned nil cmd, want non-nil")
+	}
+	msg := cmd()
+	chosen, ok := msg.(pickerChosenMsg)
+	if !ok {
+		t.Fatalf("cmd() type = %T; want pickerChosenMsg", msg)
+	}
+	if chosen.host.Name != "prod-db" {
+		t.Fatalf("pickerChosenMsg.host = %v; want prod-db", chosen.host.Name)
+	}
+
+	// KeyEsc returns a command that emits pickerCancelledMsg
+	cmd = p.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Fatal("KeyEsc returned nil cmd, want non-nil")
+	}
+	msg = cmd()
+	if _, ok := msg.(pickerCancelledMsg); !ok {
+		t.Fatalf("cmd() type = %T; want pickerCancelledMsg", msg)
+	}
+}
+
+func TestPickerViewEmptyDoesNotPanic(t *testing.T) {
+	// nil host list
+	p := newPicker(nil)
+	s := p.View()
+	if s == "" {
+		t.Fatal("View() with nil hosts returned empty string")
+	}
+
+	// non-nil hosts but query filters all out
+	p2 := newPicker(sampleHosts())
+	p2.setQuery("zzzznomatch")
+	s2 := p2.View()
+	if s2 == "" {
+		t.Fatal("View() with no-match query returned empty string")
+	}
+	if len(p2.visibleHosts()) != 0 {
+		t.Fatal("visibleHosts() with no-match query should be empty")
+	}
 }
