@@ -87,6 +87,39 @@ func TestKnownHostsMismatchFails(t *testing.T) {
 	}
 }
 
+func TestKnownHostsToleratesMalformedLine(t *testing.T) {
+	path := t.TempDir() + "/known_hosts"
+	// Line 1 is a corrupt fragment x/crypto's strict parser rejects
+	// ("missing host pattern"); it must not block verification of any host.
+	if err := os.WriteFile(path, []byte(":442\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	key := testHostKey(t)
+	addr := &net.TCPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 22}
+
+	var asked bool
+	v := NewHostKeyVerifier(path, func(string, ssh.PublicKey) bool {
+		asked = true
+		return true
+	})
+	if err := v.Callback()("host:22", addr, key); err != nil {
+		t.Fatalf("malformed known_hosts line must not break the verifier: %v", err)
+	}
+	if !asked {
+		t.Fatal("unknown host should still trigger TOFU despite the malformed line")
+	}
+
+	// The accepted entry now sits after the malformed line; it must still
+	// verify silently on a fresh verifier.
+	v2 := NewHostKeyVerifier(path, func(string, ssh.PublicKey) bool {
+		t.Fatal("known host must not prompt")
+		return false
+	})
+	if err := v2.Callback()("host:22", addr, key); err != nil {
+		t.Fatalf("entry after a malformed line must still verify: %v", err)
+	}
+}
+
 func TestKnownHostsKnownKeyDoesNotAsk(t *testing.T) {
 	path := t.TempDir() + "/known_hosts"
 	key := testHostKey(t)

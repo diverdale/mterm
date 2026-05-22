@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -54,7 +55,10 @@ func (v *HostKeyVerifier) Callback() ssh.HostKeyCallback {
 	}
 }
 
-// baseCallback builds a knownhosts callback, tolerating a missing file.
+// baseCallback builds a knownhosts callback, tolerating a missing file. If the
+// file contains lines x/crypto's strict parser rejects, it falls back to
+// building the callback from only the parseable entries — like OpenSSH, which
+// ignores malformed known_hosts lines instead of refusing every host.
 func (v *HostKeyVerifier) baseCallback() (ssh.HostKeyCallback, error) {
 	if _, err := os.Stat(v.path); os.IsNotExist(err) {
 		if err := os.MkdirAll(filepath.Dir(v.path), 0o700); err != nil {
@@ -64,7 +68,45 @@ func (v *HostKeyVerifier) baseCallback() (ssh.HostKeyCallback, error) {
 			return nil, err
 		}
 	}
-	return knownhosts.New(v.path)
+	if cb, err := knownhosts.New(v.path); err == nil {
+		return cb, nil
+	}
+	return v.lenientCallback()
+}
+
+// lenientCallback builds a knownhosts callback from only the entries x/crypto
+// can parse, skipping malformed lines. The kept entries are written to a
+// temporary file because knownhosts.New requires a file path.
+func (v *HostKeyVerifier) lenientCallback() (ssh.HostKeyCallback, error) {
+	data, err := os.ReadFile(v.path)
+	if err != nil {
+		return nil, err
+	}
+	var good []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if t := strings.TrimSpace(line); t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		if _, _, _, _, _, perr := ssh.ParseKnownHosts([]byte(line + "\n")); perr != nil {
+			continue // drop a line the strict parser rejects
+		}
+		good = append(good, line)
+	}
+	tmp, err := os.CreateTemp("", "mterm-known-hosts-*")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmp.Name())
+	if len(good) > 0 {
+		if _, err := tmp.WriteString(strings.Join(good, "\n") + "\n"); err != nil {
+			tmp.Close()
+			return nil, err
+		}
+	}
+	if err := tmp.Close(); err != nil {
+		return nil, err
+	}
+	return knownhosts.New(tmp.Name())
 }
 
 func (v *HostKeyVerifier) append(hostname string, remote net.Addr, key ssh.PublicKey) error {
