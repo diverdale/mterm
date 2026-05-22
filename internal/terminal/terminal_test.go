@@ -135,10 +135,10 @@ func TestRenderIncludesColor(t *testing.T) {
 	}
 }
 
-// reverseVideoRE matches the SGR reverse-video attribute (\x1b[7m).
-// We match specifically on 7 (or sequences containing 7;... / ...;7)
-// to confirm a reverse-video cursor was drawn.
-var reverseVideoRE = regexp.MustCompile(`\x1b\[[0-9;]*7[0-9;]*m|\x1b\[7m`)
+// reverseVideoRE matches the SGR reverse-video attribute (\x1b[7m) where 7
+// appears as a complete parameter, not as a substring of another parameter
+// (e.g. it must not match \x1b[37m or \x1b[27m).
+var reverseVideoRE = regexp.MustCompile(`\x1b\[(?:\d+;)*7(?:;\d+)*m`)
 
 // TestRenderDrawsCursor verifies that Render() draws a reverse-video block
 // cursor at the cursor position when the cursor is visible (DECTCEM default).
@@ -168,5 +168,19 @@ func TestHiddenCursorNotDrawn(t *testing.T) {
 	out := term.Render()
 	if reverseVideoRE.MatchString(out) {
 		t.Fatalf("Render() drew a cursor even though DECTCEM is reset; got %q", out)
+	}
+}
+
+// TestCursorDoesNotCorruptWideChar is the regression test for Fix 1: when the
+// cursor lands on a wide-char continuation cell (the right half of a wide
+// character such as 中), Render() must not destroy the wide character.
+func TestCursorDoesNotCorruptWideChar(t *testing.T) {
+	term := New(20, 3)
+	term.Write([]byte("中\x08")) // wide char, then backspace -> cursor on continuation cell
+	if r1 := term.Render(); !strings.Contains(r1, "中") {
+		t.Fatalf("wide char missing before second render: %q", r1)
+	}
+	if r2 := term.Render(); !strings.Contains(r2, "中") {
+		t.Fatalf("Render() corrupted the wide char: %q", r2)
 	}
 }

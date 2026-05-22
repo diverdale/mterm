@@ -94,27 +94,29 @@ func (t *Terminal) Render() string {
 	cx, cy := pos.X, pos.Y
 
 	orig := t.vt.CellAt(cx, cy)
-	var saved *uv.Cell
-	if orig != nil {
-		saved = orig.Clone()
+
+	// Fix 1: if the cursor lands on a wide-char continuation cell (Width==0),
+	// injecting a new cell there corrupts the source wide character and the
+	// restore does not recover it. Skip cursor injection for this rare case.
+	if orig != nil && orig.Width == 0 {
+		return t.vt.Render()
 	}
 
 	// Build the cursor cell: clone the original (or a space) and set reverse video.
+	// Fix 3: clone once for saved (restore), then copy for cursorCell mutation.
+	var saved *uv.Cell
 	var cursorCell uv.Cell
 	if orig != nil {
-		cursorCell = *orig.Clone()
+		saved = orig.Clone()
+		cursorCell = *saved
 	} else {
 		cursorCell = uv.EmptyCell
 	}
 	cursorCell.Style.Attrs |= uv.AttrReverse
 	t.vt.SetCell(cx, cy, &cursorCell)
-
-	out := t.vt.Render()
-
-	// Restore the original cell.
-	t.vt.SetCell(cx, cy, saved)
-
-	return out
+	// Fix 2: use defer so the restore runs even if t.vt.Render() panics.
+	defer t.vt.SetCell(cx, cy, saved)
+	return t.vt.Render()
 }
 
 // CursorPosition returns the 0-indexed cursor column and row.
