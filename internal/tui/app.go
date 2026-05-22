@@ -79,6 +79,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (a *App) update(msg tea.Msg) tea.Cmd {
 	switch m := msg.(type) {
 	case tickMsg:
+		a.reapEndedTabs()
 		return tea.Tick(renderInterval, func(time.Time) tea.Msg { return tickMsg{} })
 
 	case tea.WindowSizeMsg:
@@ -236,6 +237,18 @@ func (a *App) closeActiveTab() {
 		return
 	}
 	a.removeTabAt(a.active)
+}
+
+// reapEndedTabs removes any tab whose remote session has finished, so a tab
+// closes automatically when its shell exits.
+func (a *App) reapEndedTabs() {
+	for i := 0; i < len(a.tabs); {
+		if a.tabs[i].hasEnded() {
+			a.removeTabAt(i)
+		} else {
+			i++
+		}
+	}
 }
 
 // shutdown closes every open session before ending the program.

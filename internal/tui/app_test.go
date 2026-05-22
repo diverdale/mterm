@@ -246,3 +246,31 @@ func TestAppPickerViewShowsConnectError(t *testing.T) {
 		t.Fatalf("picker View must surface the connect error, got:\n%s", app.View())
 	}
 }
+
+func TestAppReapsEndedTabs(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.tabs = []*sessionTab{
+		newSessionTab(1, config.Host{Name: "a"}, 80, 24),
+		newSessionTab(2, config.Host{Name: "b"}, 80, 24),
+	}
+	app.active = 1
+	app.mode = modeSession
+
+	// The first tab's remote shell exited.
+	app.tabs[0].ended.Store(true)
+	app.update(tickMsg{})
+	if len(app.tabs) != 1 {
+		t.Fatalf("ended tab not reaped: len(tabs) = %d, want 1", len(app.tabs))
+	}
+	if app.tabs[0].title() != "b" {
+		t.Fatalf("wrong tab survived reaping: %q", app.tabs[0].title())
+	}
+
+	// When the last tab ends, the app returns to the picker.
+	app.tabs[0].ended.Store(true)
+	app.update(tickMsg{})
+	if len(app.tabs) != 0 || app.mode != modePicker {
+		t.Fatalf("after last tab ends: tabs=%d mode=%v, want 0/modePicker", len(app.tabs), app.mode)
+	}
+}

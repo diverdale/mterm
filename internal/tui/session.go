@@ -13,11 +13,12 @@ const tabBarRows = 1
 
 // sessionTab is one connection tab: an ssh.Session feeding a terminal emulator.
 type sessionTab struct {
-	id   int
-	host config.Host
-	term *terminal.Terminal
-	sess atomic.Pointer[mssh.Session] // nil until connected
-	w, h int                          // full tab area including the tab bar
+	id    int
+	host  config.Host
+	term  *terminal.Terminal
+	sess  atomic.Pointer[mssh.Session] // nil until connected
+	ended atomic.Bool                  // set once the reader goroutine exits
+	w, h  int                          // full tab area including the tab bar
 }
 
 // newSessionTab creates a tab sized to the given total area.
@@ -37,6 +38,10 @@ func newSessionTab(id int, host config.Host, w, h int) *sessionTab {
 
 func (t *sessionTab) title() string { return t.host.Name }
 
+// hasEnded reports whether the remote session has finished (the user ran
+// `exit`, the connection dropped, etc.).
+func (t *sessionTab) hasEnded() bool { return t.ended.Load() }
+
 // attach binds a connected ssh.Session and starts the reader goroutine.
 func (t *sessionTab) attach(s *mssh.Session) {
 	t.sess.Store(s)
@@ -44,9 +49,13 @@ func (t *sessionTab) attach(s *mssh.Session) {
 }
 
 // readLoop copies remote output into the emulator until the session ends. It
-// recovers from panics so one bad session cannot crash the program.
+// recovers from panics so one bad session cannot crash the program, and marks
+// the tab ended on exit so the app can reap it.
 func (t *sessionTab) readLoop() {
-	defer func() { _ = recover() }()
+	defer func() {
+		_ = recover()
+		t.ended.Store(true)
+	}()
 	s := t.sess.Load()
 	if s == nil {
 		return
