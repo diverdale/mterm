@@ -20,10 +20,10 @@ type windowOpts struct {
 }
 
 // renderWindow composes a bordered window: a titled top border, an optional
-// tab-strip row, the body, a divider, the footer, and a bottom border. The
-// result is exactly width × height when height is at least the chrome height
-// (4 rows without a tab strip, 5 with one); for a smaller height the result
-// is that chrome minimum.
+// tab-strip row and tab divider, the body, a divider, the footer, and a bottom
+// border. The result is exactly width × height when height is at least the
+// chrome height (4 rows without a tab strip, 6 with one); for a smaller height
+// the result is that chrome minimum.
 func renderWindow(o windowOpts) string {
 	if o.width < 4 {
 		o.width = 4
@@ -34,6 +34,7 @@ func renderWindow(o windowOpts) string {
 	rows = append(rows, topBorder(o.title, o.width))
 	if o.tabStrip != "" {
 		rows = append(rows, sideRow(o.tabStrip, inner))
+		rows = append(rows, divider(o.width))
 	}
 
 	// Body fills whatever vertical space is left between the rows already

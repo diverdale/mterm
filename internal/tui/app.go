@@ -297,15 +297,20 @@ func (a *App) View() string {
 	}
 }
 
-// clock returns the current HH:MM string for the footer.
-func clock() string { return time.Now().Format("15:04") }
+// fmtUptime formats a duration as HH:MM:SS.
+func fmtUptime(d time.Duration) string {
+	s := int(d.Seconds())
+	if s < 0 {
+		s = 0
+	}
+	return fmt.Sprintf("%02d:%02d:%02d", s/3600, (s/60)%60, s%60)
+}
 
 func (a *App) pickerView() string {
 	a.picker.setSize(a.width-chromeCols, a.height-4)
 	footer := renderFooter(footerOpts{
 		hints: []keyHint{{"enter", "connect"}, {"type", "filter"}, {"esc", "back"}},
 		info:  fmt.Sprintf("%d hosts", len(a.picker.all)),
-		clock: clock(),
 		width: a.width - 2,
 	})
 	body := a.picker.View()
@@ -326,13 +331,12 @@ func (a *App) sessionView() string {
 	if t == nil {
 		return a.pickerView()
 	}
-	title := statusGlyph(t.status(), a.tickCount) + " " +
-		sty.title.Render(t.title()) + statusCount(len(a.tabs))
+	title := sty.title.Render("mterm") + statusCount(len(a.tabs))
 	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2)
 	footer := renderFooter(footerOpts{
 		hints:         []keyHint{{"^B", "menu"}, {"^B n", "next"}, {"^B x", "close"}},
 		info:          sessionInfo(t.host),
-		clock:         clock(),
+		timer:         fmtUptime(t.uptime()),
 		prefixPending: a.prefixPending,
 		width:         a.width - 2,
 	})

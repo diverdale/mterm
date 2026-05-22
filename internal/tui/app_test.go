@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -298,6 +299,22 @@ func TestAppSpinnerCounterAdvances(t *testing.T) {
 	app.update(tickMsg{})
 	if app.tickCount != before+1 {
 		t.Fatalf("tickCount = %d, want %d", app.tickCount, before+1)
+	}
+}
+
+func TestFmtUptime(t *testing.T) {
+	cases := []struct {
+		d    time.Duration
+		want string
+	}{
+		{0, "00:00:00"},
+		{90 * time.Second, "00:01:30"},
+		{3661 * time.Second, "01:01:01"},
+	}
+	for _, c := range cases {
+		if got := fmtUptime(c.d); got != c.want {
+			t.Fatalf("fmtUptime(%v) = %q, want %q", c.d, got, c.want)
+		}
 	}
 }
 

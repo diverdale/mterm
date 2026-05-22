@@ -77,9 +77,9 @@ func TestWindowMinHeightNoTab(t *testing.T) {
 
 func TestWindowShortWithTab(t *testing.T) {
 	out := renderWindow(windowOpts{
-		title: "t", tabStrip: "tabs", body: "b", footer: "f", width: 20, height: 5,
+		title: "t", tabStrip: "tabs", body: "b", footer: "f", width: 20, height: 6,
 	})
-	if got := len(strings.Split(out, "\n")); got != 5 {
-		t.Fatalf("with-tab window at height 5 produced %d lines, want 5", got)
+	if got := len(strings.Split(out, "\n")); got != 6 {
+		t.Fatalf("with-tab window at height 6 produced %d lines, want 6", got)
 	}
 }

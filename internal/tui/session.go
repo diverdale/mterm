@@ -2,6 +2,7 @@ package tui
 
 import (
 	"sync/atomic"
+	"time"
 
 	"mterm/internal/config"
 	mssh "mterm/internal/ssh"
@@ -10,10 +11,10 @@ import (
 
 // chromeCols and chromeRows are the screen space the window frame reserves
 // around a session's terminal body: left+right borders, and (top border, tab
-// strip, divider, footer, bottom border) respectively.
+// strip, tab divider, footer divider, footer, bottom border) respectively.
 const (
 	chromeCols = 2
-	chromeRows = 5
+	chromeRows = 6
 )
 
 // tabStatus is a session tab's connection state, derived from the tab.
@@ -41,25 +42,30 @@ func (t *sessionTab) status() tabStatus {
 
 // sessionTab is one connection tab: an ssh.Session feeding a terminal emulator.
 type sessionTab struct {
-	id    int
-	host  config.Host
-	term  *terminal.Terminal
-	sess  atomic.Pointer[mssh.Session] // nil until connected
-	ended atomic.Bool                  // set once the reader goroutine exits
-	w, h  int                          // full tab area including the tab bar
+	id      int
+	host    config.Host
+	term    *terminal.Terminal
+	sess    atomic.Pointer[mssh.Session] // nil until connected
+	ended   atomic.Bool                  // set once the reader goroutine exits
+	w, h    int                          // full tab area including the tab bar
+	started time.Time                    // when this tab was opened
 }
 
 // newSessionTab creates a tab sized to the given total area.
 func newSessionTab(id int, host config.Host, w, h int) *sessionTab {
 	bodyW, bodyH := h2body(w, h)
 	return &sessionTab{
-		id:   id,
-		host: host,
-		term: terminal.New(bodyW, bodyH),
-		w:    w,
-		h:    h,
+		id:      id,
+		host:    host,
+		term:    terminal.New(bodyW, bodyH),
+		w:       w,
+		h:       h,
+		started: time.Now(),
 	}
 }
+
+// uptime returns how long this tab has been open.
+func (t *sessionTab) uptime() time.Duration { return time.Since(t.started) }
 
 func (t *sessionTab) title() string { return t.host.Name }
 

@@ -17,7 +17,7 @@ type keyHint struct {
 type footerOpts struct {
 	hints         []keyHint // left-side keybinding hints
 	info          string    // right-side context (user@host:port, or "N hosts")
-	clock         string    // far-right clock text, e.g. "14:05"; "" to omit
+	timer         string    // far-right timer text, e.g. "00:01:30"; "" to omit
 	prefixPending bool      // show the PREFIX badge instead of hints
 	width         int
 }
@@ -38,11 +38,11 @@ func renderFooter(o footerOpts) string {
 	}
 
 	right := o.info
-	if o.clock != "" {
+	if o.timer != "" {
 		if right != "" {
 			right += "  "
 		}
-		right += o.clock
+		right += o.timer
 	}
 	right = sty.footerInfo.Render(right)
 
