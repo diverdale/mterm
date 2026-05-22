@@ -66,6 +66,23 @@ func TestForwardsPanelViewEmptyDoesNotPanic(t *testing.T) {
 	}
 }
 
+func TestForwardsPanelIsThemed(t *testing.T) {
+	host := config.Host{
+		Name:     "h",
+		Forwards: []config.Forward{{Type: config.ForwardLocal, BindPort: 8080}},
+	}
+	panel := newForwardsPanel(host)
+	out := panel.View()
+	// Themed output carries ANSI escape codes.
+	if !strings.Contains(out, "\x1b[") {
+		t.Fatalf("forwards panel has no styling:\n%s", out)
+	}
+	// Still shows the rounded modal border.
+	if !strings.Contains(out, "╭") && !strings.Contains(out, "─") {
+		t.Fatalf("forwards panel lost its border:\n%s", out)
+	}
+}
+
 func TestForwardsPanelUpdateCursorAndToggle(t *testing.T) {
 	host := config.Host{
 		Name: "h",

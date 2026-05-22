@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"mterm/internal/config"
 )
@@ -55,12 +56,13 @@ func (p *forwardsPanel) Update(msg tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
-// View renders the panel.
+// View renders the forwards modal.
 func (p *forwardsPanel) View() string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Port forwards — %s\n\n", p.host.Name))
+	b.WriteString(sty.title.Render("Port forwards — " + p.host.Name))
+	b.WriteString("\n\n")
 	if len(p.host.Forwards) == 0 {
-		b.WriteString(statusBar.Render("  (no forwards configured for this host)"))
+		b.WriteString(sty.dim.Render("  (no forwards configured for this host)"))
 		b.WriteString("\n")
 	}
 	for i, f := range p.host.Forwards {
@@ -68,14 +70,21 @@ func (p *forwardsPanel) View() string {
 		if i == p.cursor {
 			cursor = "> "
 		}
-		mark := "[ ]"
+		mark := sty.dim.Render("[ ]")
 		if p.on[i] {
-			mark = "[x]"
+			mark = sty.connected.Render("[x]")
 		}
-		b.WriteString(fmt.Sprintf("%s%s %-6s %d -> %s:%d\n",
-			cursor, mark, f.Type.String(), f.BindPort, f.DialAddr, f.DialPort))
+		line := fmt.Sprintf("%s%s %-6s %d -> %s:%d",
+			cursor, mark, f.Type.String(), f.BindPort, f.DialAddr, f.DialPort)
+		b.WriteString(line)
+		b.WriteString("\n")
 	}
 	b.WriteString("\n")
-	b.WriteString(statusBar.Render("  space: toggle   esc: close"))
-	return modalBox.Render(b.String())
+	b.WriteString(sty.dim.Render("  space: toggle   esc: close"))
+
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(active.Accent).
+		Padding(1, 2)
+	return box.Render(b.String())
 }
