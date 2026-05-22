@@ -68,6 +68,9 @@ func (s *Session) StartForward(spec config.Forward) (*PortForward, error) {
 	}
 
 	pf := &PortForward{spec: spec, listener: ln}
+	s.mu.Lock()
+	s.forwards = append(s.forwards, pf)
+	s.mu.Unlock()
 	go pf.acceptLoop(client, dialAddr)
 	return pf, nil
 }
@@ -100,7 +103,8 @@ func (p *PortForward) pipe(client sshDialer, incoming net.Conn, dialAddr string)
 	go func() { io.Copy(incoming, target); incoming.Close() }()
 }
 
-// sshDialer is the subset of *ssh.Client used by forwards.
+// sshDialer is the *ssh.Client method used to dial through the tunnel in the
+// forward pipe. (StartForward also calls *ssh.Client.Listen directly for -R.)
 type sshDialer interface {
 	Dial(network, addr string) (net.Conn, error)
 }

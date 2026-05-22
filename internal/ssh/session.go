@@ -47,13 +47,14 @@ type Session struct {
 	hostKey  ssh.HostKeyCallback
 	dialAddr string // host:port to dial; defaults to host.Addr()
 
-	mu      sync.Mutex
-	state   State
-	lastErr error
-	client  *ssh.Client
-	sess    *ssh.Session
-	stdin   io.WriteCloser
-	stdout  io.Reader
+	mu       sync.Mutex
+	state    State
+	lastErr  error
+	client   *ssh.Client
+	sess     *ssh.Session
+	stdin    io.WriteCloser
+	stdout   io.Reader
+	forwards []*PortForward // active port forwards, stopped on Close
 
 	closed bool // true once the user called Close
 }
@@ -215,7 +216,12 @@ func (s *Session) Close() error {
 	sess, client := s.sess, s.client
 	s.sess, s.client, s.stdin, s.stdout = nil, nil, nil, nil
 	s.state = StateClosed
+	forwards := s.forwards
+	s.forwards = nil
 	s.mu.Unlock()
+	for _, pf := range forwards {
+		pf.Stop()
+	}
 	if sess != nil {
 		sess.Close()
 	}

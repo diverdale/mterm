@@ -10,6 +10,61 @@ import (
 	"mterm/internal/config"
 )
 
+func TestStartForwardNotConnected(t *testing.T) {
+	s := NewSession(config.Host{Name: "x", HostName: "127.0.0.1"}, noAuth{}, insecureHostKey())
+	fwd := config.Forward{
+		Type:     config.ForwardLocal,
+		BindAddr: "127.0.0.1",
+		BindPort: 0,
+		DialAddr: "127.0.0.1",
+		DialPort: 1,
+	}
+	_, err := s.StartForward(fwd)
+	if err == nil {
+		t.Fatal("StartForward on unconnected session should return an error")
+	}
+}
+
+func TestSessionCloseStopsForwards(t *testing.T) {
+	srv := newTestServer(t)
+	s := dialTestSession(t, srv)
+
+	echoHost, echoPort := echoListener(t)
+	fwd := config.Forward{
+		Type:     config.ForwardLocal,
+		BindAddr: "127.0.0.1",
+		BindPort: 0,
+		DialAddr: echoHost,
+		DialPort: echoPort,
+	}
+	pf, err := s.StartForward(fwd)
+	if err != nil {
+		t.Fatalf("StartForward: %v", err)
+	}
+	localAddr := pf.LocalAddr()
+
+	// Confirm the forward is live.
+	probe, err := net.Dial("tcp", localAddr)
+	if err != nil {
+		t.Fatalf("probe dial before Close: %v", err)
+	}
+	probe.Close()
+
+	// Close the session — this must stop the forward.
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// After Close the local listener must be gone.
+	if c, err := net.Dial("tcp", localAddr); err == nil {
+		c.Close()
+		t.Fatal("expected dial to fail after session Close, but it succeeded")
+	}
+
+	// Calling Stop again must not panic (idempotent).
+	pf.Stop()
+}
+
 // echoListener starts a TCP echo server and returns its host and port.
 func echoListener(t *testing.T) (string, int) {
 	t.Helper()
@@ -54,7 +109,9 @@ func TestLocalForwardEndToEnd(t *testing.T) {
 		t.Fatalf("dial forwarded port: %v", err)
 	}
 	defer conn.Close()
-	conn.SetDeadline(time.Now().Add(2 * time.Second))
+	if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := conn.Write([]byte("forwarded!\n")); err != nil {
 		t.Fatalf("write: %v", err)
