@@ -52,7 +52,7 @@ func (t *Terminal) Size() (w, h int) {
 }
 
 // Render returns the visible screen as a plain-text string with exactly h rows
-// joined by h-1 newline characters. Each row is padded with spaces to width w.
+// joined by h-1 newline characters. Each row occupies exactly w display columns.
 func (t *Terminal) Render() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -62,21 +62,30 @@ func (t *Terminal) Render() string {
 		if y > 0 {
 			sb.WriteByte('\n')
 		}
-		row := make([]byte, t.w)
-		for i := range row {
-			row[i] = ' '
+		// cols holds one string per display column.  Default is a space.
+		cols := make([]string, t.w)
+		for i := range cols {
+			cols[i] = " "
 		}
-		for x := 0; x < t.w; x++ {
+		for x := 0; x < t.w; {
 			cell := t.vt.CellAt(x, y)
-			if cell != nil && !cell.IsZero() {
-				s := cell.Content
-				if len(s) > 0 {
-					// Write as many bytes as fit in the row slot.
-					copy(row[x:], []byte(s))
+			if cell != nil && !cell.IsZero() && cell.Content != "" {
+				cols[x] = cell.Content
+				w := cell.Width
+				if w < 1 {
+					w = 1
 				}
+				// Mark continuation columns for wide glyphs as empty
+				// so they contribute zero extra display width.
+				for c := 1; c < w && x+c < t.w; c++ {
+					cols[x+c] = ""
+				}
+				x += w
+			} else {
+				x++
 			}
 		}
-		sb.Write(row)
+		sb.WriteString(strings.Join(cols, ""))
 	}
 	return sb.String()
 }
