@@ -3,6 +3,7 @@ package ssh
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/binary"
 	"io"
 	"net"
 	"sync"
@@ -92,8 +93,8 @@ func (s *testServer) handle(conn net.Conn) {
 					r.Reply(true, nil)
 				case "window-change":
 					if len(r.Payload) >= 8 {
-						w := int(r.Payload[3])
-						h := int(r.Payload[7])
+						w := int(binary.BigEndian.Uint32(r.Payload[0:4]))
+						h := int(binary.BigEndian.Uint32(r.Payload[4:8]))
 						select {
 						case s.winch <- [2]int{w, h}:
 						default:

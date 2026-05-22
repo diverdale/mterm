@@ -64,18 +64,81 @@ func TestSessionStateConnected(t *testing.T) {
 // readWithin reads from the session's output until want appears or timeout.
 func readWithin(t *testing.T, s *Session, want string, timeout time.Duration) string {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	buf := make([]byte, 4096)
-	var acc strings.Builder
-	for time.Now().Before(deadline) {
-		s.SetReadDeadline(time.Now().Add(50 * time.Millisecond))
-		n, _ := s.Read(buf)
-		acc.Write(buf[:n])
-		if strings.Contains(acc.String(), want) {
-			break
+	result := make(chan string, 1)
+	go func() {
+		buf := make([]byte, 4096)
+		var acc strings.Builder
+		for {
+			n, err := s.Read(buf)
+			if n > 0 {
+				acc.Write(buf[:n])
+				if strings.Contains(acc.String(), want) {
+					result <- acc.String()
+					return
+				}
+			}
+			if err != nil {
+				result <- acc.String()
+				return
+			}
 		}
+	}()
+	select {
+	case got := <-result:
+		return got
+	case <-time.After(timeout):
+		t.Fatalf("timed out waiting for %q in session output", want)
+		return ""
 	}
-	return acc.String()
+}
+
+func TestSessionConnectFailureSetsState(t *testing.T) {
+	host := config.Host{Name: "bad", HostName: "127.0.0.1"}
+	s := NewSession(host, noAuth{}, insecureHostKey())
+	s.dialAddr = "127.0.0.1:1" // nothing listening here
+	err := s.Connect(80, 24)
+	if err == nil {
+		t.Fatal("Connect should have failed but returned nil")
+	}
+	if s.State() != StateFailed {
+		t.Fatalf("state = %v, want Failed", s.State())
+	}
+	if s.LastError() == nil {
+		t.Fatal("LastError should be non-nil after failed Connect")
+	}
+}
+
+func TestSessionWriteBeforeConnect(t *testing.T) {
+	host := config.Host{Name: "test", HostName: "127.0.0.1"}
+	s := NewSession(host, noAuth{}, insecureHostKey())
+
+	if _, err := s.Write([]byte("x")); err == nil {
+		t.Fatal("Write before Connect should return an error")
+	}
+	if err := s.Resize(80, 24); err == nil {
+		t.Fatal("Resize before Connect should return an error")
+	}
+}
+
+func TestSessionCloseIsIdempotent(t *testing.T) {
+	srv := newTestServer(t)
+	host := config.Host{Name: "test", HostName: "127.0.0.1"}
+	s := NewSession(host, noAuth{}, insecureHostKey())
+	s.dialAddr = srv.addr
+	if err := s.Connect(80, 24); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+
+	// Call Close twice; neither should panic.
+	if err := s.Close(); err != nil {
+		t.Fatalf("first Close: %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+	if s.State() != StateClosed {
+		t.Fatalf("state = %v, want Closed", s.State())
+	}
 }
 
 // noAuth is an AuthProvider that offers no methods (the test server allows

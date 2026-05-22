@@ -3,6 +3,7 @@ package ssh
 import (
 	"fmt"
 	"io"
+	osuser "os/user"
 	"sync"
 	"time"
 
@@ -53,14 +54,8 @@ type Session struct {
 	sess    *ssh.Session
 	stdin   io.WriteCloser
 	stdout  io.Reader
-	conn    deadlineConn // underlying net.Conn for read deadlines (test use)
 
 	closed bool // true once the user called Close
-}
-
-// deadlineConn is the subset of net.Conn used for test read deadlines.
-type deadlineConn interface {
-	SetReadDeadline(time.Time) error
 }
 
 // NewSession builds an unconnected Session for the given host.
@@ -110,7 +105,11 @@ func (s *Session) Connect(cols, rows int) error {
 	}
 	user := s.host.User
 	if user == "" {
-		user = "root"
+		if u, err := osuser.Current(); err == nil {
+			user = u.Username
+		} else {
+			user = "root"
+		}
 	}
 	cfg := &ssh.ClientConfig{
 		User:            user,
@@ -190,17 +189,6 @@ func (s *Session) Read(p []byte) (int, error) {
 		return 0, io.EOF
 	}
 	return r.Read(p)
-}
-
-// SetReadDeadline is a test hook; it is a no-op when no deadlineConn is set.
-func (s *Session) SetReadDeadline(t time.Time) error {
-	s.mu.Lock()
-	c := s.conn
-	s.mu.Unlock()
-	if c == nil {
-		return nil
-	}
-	return c.SetReadDeadline(t)
 }
 
 // Resize changes the remote PTY dimensions.
