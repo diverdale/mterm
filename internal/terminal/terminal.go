@@ -1,7 +1,6 @@
 package terminal
 
 import (
-	"strings"
 	"sync"
 
 	xvt "github.com/charmbracelet/x/vt"
@@ -51,43 +50,16 @@ func (t *Terminal) Size() (w, h int) {
 	return t.w, t.h
 }
 
-// Render returns the visible screen as a plain-text string with exactly h rows
-// joined by h-1 newline characters. Each row occupies exactly w display columns.
+// Render returns the visible screen as a string with exactly h rows joined by
+// h-1 newline characters. Cell foreground/background colors and text attributes
+// (bold, italic, etc.) are encoded as ANSI SGR escape sequences so that remote
+// programs (htop, vim, ls --color, …) display in color. Each row that contains
+// styled content ends with an ANSI reset (\x1b[m) so colors cannot bleed into
+// the tab bar or adjacent rows.
 func (t *Terminal) Render() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-
-	var sb strings.Builder
-	for y := 0; y < t.h; y++ {
-		if y > 0 {
-			sb.WriteByte('\n')
-		}
-		// cols holds one string per display column.  Default is a space.
-		cols := make([]string, t.w)
-		for i := range cols {
-			cols[i] = " "
-		}
-		for x := 0; x < t.w; {
-			cell := t.vt.CellAt(x, y)
-			if cell != nil && !cell.IsZero() && cell.Content != "" {
-				cols[x] = cell.Content
-				w := cell.Width
-				if w < 1 {
-					w = 1
-				}
-				// Mark continuation columns for wide glyphs as empty
-				// so they contribute zero extra display width.
-				for c := 1; c < w && x+c < t.w; c++ {
-					cols[x+c] = ""
-				}
-				x += w
-			} else {
-				x++
-			}
-		}
-		sb.WriteString(strings.Join(cols, ""))
-	}
-	return sb.String()
+	return t.vt.Render()
 }
 
 // CursorPosition returns the 0-indexed cursor column and row.

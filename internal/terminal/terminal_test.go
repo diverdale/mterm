@@ -1,10 +1,14 @@
 package terminal
 
 import (
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
 )
+
+// sgrRE matches any ANSI SGR escape sequence (e.g. \x1b[31m, \x1b[0m, \x1b[m).
+var sgrRE = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 func TestWriteAndRenderPlainText(t *testing.T) {
 	term := New(20, 5)
@@ -41,10 +45,14 @@ func TestCarriageReturnAndNewlineMoveCursor(t *testing.T) {
 	term := New(20, 5)
 	term.Write([]byte("abc\r\ndef"))
 	lines := strings.Split(term.Render(), "\n")
-	if !strings.HasPrefix(lines[0], "abc") {
+	// Strip any ANSI SGR codes before comparing text content so this test
+	// remains correct even when Render() emits styling.
+	plain0 := sgrRE.ReplaceAllString(lines[0], "")
+	plain1 := sgrRE.ReplaceAllString(lines[1], "")
+	if !strings.HasPrefix(plain0, "abc") {
 		t.Fatalf("row 0 = %q want abc...", lines[0])
 	}
-	if !strings.HasPrefix(lines[1], "def") {
+	if !strings.HasPrefix(plain1, "def") {
 		t.Fatalf("row 1 = %q want def...", lines[1])
 	}
 }
@@ -105,4 +113,24 @@ func TestConcurrentWriteAndRender(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+// TestRenderIncludesColor is the regression test that proves color information
+// survives a Write/Render round-trip. A program that emits "\x1b[31mred\x1b[0m"
+// (red text) must produce output from Render() that contains at least one ANSI
+// SGR escape sequence — i.e. Render() is no longer plain text.
+func TestRenderIncludesColor(t *testing.T) {
+	term := New(20, 5)
+	if _, err := term.Write([]byte("\x1b[31mred\x1b[0m")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	out := term.Render()
+	if !sgrRE.MatchString(out) {
+		t.Fatalf("Render() contains no ANSI SGR escape sequence; got %q", out)
+	}
+	// Also confirm the text content is present.
+	plain := sgrRE.ReplaceAllString(out, "")
+	if !strings.Contains(plain, "red") {
+		t.Fatalf("Render() plain text does not contain 'red'; got %q", out)
+	}
 }
