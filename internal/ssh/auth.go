@@ -30,16 +30,25 @@ func AgentProviderFromEnv() (*AgentProvider, error) {
 	return &AgentProvider{SocketPath: sock}, nil
 }
 
-// Methods dials the agent and returns a public-key auth method backed by it.
+// Methods returns a public-key auth method backed by the ssh-agent. It probes
+// the agent socket eagerly so an unreachable agent fails fast; the returned
+// auth method dials a fresh, short-lived connection for each key negotiation,
+// so no socket is held open between handshakes.
 func (p *AgentProvider) Methods() ([]ssh.AuthMethod, error) {
+	probe, err := net.Dial("unix", p.SocketPath)
+	if err != nil {
+		return nil, fmt.Errorf("connect to ssh-agent: %w", err)
+	}
+	probe.Close()
+	return []ssh.AuthMethod{ssh.PublicKeysCallback(p.signers)}, nil
+}
+
+// signers dials the agent, retrieves its signers, and closes the connection.
+func (p *AgentProvider) signers() ([]ssh.Signer, error) {
 	conn, err := net.Dial("unix", p.SocketPath)
 	if err != nil {
 		return nil, fmt.Errorf("connect to ssh-agent: %w", err)
 	}
-	ag := agent.NewClient(conn)
-	if _, err := ag.List(); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("query ssh-agent: %w", err)
-	}
-	return []ssh.AuthMethod{ssh.PublicKeysCallback(ag.Signers)}, nil
+	defer conn.Close()
+	return agent.NewClient(conn).Signers()
 }

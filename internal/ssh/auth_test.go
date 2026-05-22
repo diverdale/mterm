@@ -66,3 +66,36 @@ func TestAgentProviderMissingSocket(t *testing.T) {
 		t.Fatal("want error for missing agent socket")
 	}
 }
+
+func TestAgentProviderSigners(t *testing.T) {
+	sock := startFakeAgent(t)
+	p := &AgentProvider{SocketPath: sock}
+	signers, err := p.signers()
+	if err != nil {
+		t.Fatalf("signers: %v", err)
+	}
+	if len(signers) == 0 {
+		t.Fatal("want at least one signer from the agent")
+	}
+}
+
+func TestAgentProviderFromEnv(t *testing.T) {
+	t.Run("with socket set", func(t *testing.T) {
+		t.Setenv("SSH_AUTH_SOCK", "/some/path")
+		p, err := AgentProviderFromEnv()
+		if err != nil {
+			t.Fatalf("AgentProviderFromEnv: %v", err)
+		}
+		if p.SocketPath != "/some/path" {
+			t.Fatalf("want SocketPath=/some/path, got %q", p.SocketPath)
+		}
+	})
+
+	t.Run("with socket unset", func(t *testing.T) {
+		t.Setenv("SSH_AUTH_SOCK", "")
+		_, err := AgentProviderFromEnv()
+		if err == nil {
+			t.Fatal("want error when SSH_AUTH_SOCK is empty")
+		}
+	})
+}
