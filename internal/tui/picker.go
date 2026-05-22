@@ -104,17 +104,20 @@ func (p *picker) Update(msg tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
-// View renders the picker.
+// View renders the picker body: a search line and the grouped, filtered host
+// list. The window frame and footer are added by the app.
 func (p *picker) View() string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Search: %s\n\n", p.query))
+	b.WriteString(sty.dim.Render("Search: "))
+	b.WriteString(sty.search.Render(p.query))
+	b.WriteString("\n\n")
+
 	v := p.visibleHosts()
 	if len(v) == 0 {
-		b.WriteString(statusBar.Render("  (no matching hosts)"))
-		b.WriteString("\n\n")
-		b.WriteString(statusBar.Render("  enter: connect   esc: back   ctrl-c: quit"))
+		b.WriteString(sty.dim.Render("  (no matching hosts)"))
 		return b.String()
 	}
+
 	lastGroup := "\x00"
 	for i, h := range v {
 		if h.Group != lastGroup {
@@ -123,20 +126,25 @@ func (p *picker) View() string {
 			if group == "" {
 				group = "(ungrouped)"
 			}
-			b.WriteString(statusBar.Render("  " + group))
+			b.WriteString(sty.groupHeader.Render("  " + group))
 			b.WriteString("\n")
 		}
-		cursor := "  "
+		row := formatHostRow(h)
 		if i == p.cursor {
-			cursor = "> "
+			b.WriteString(sty.selectionBar.Render("> " + row))
+		} else {
+			b.WriteString(sty.dim.Render("  ") + row)
 		}
-		tags := ""
-		if len(h.Tags) > 0 {
-			tags = statusBar.Render("  [" + strings.Join(h.Tags, ",") + "]")
-		}
-		b.WriteString(fmt.Sprintf("%s%-16s %-18s%s\n", cursor, h.Name, h.HostName, tags))
+		b.WriteString("\n")
 	}
-	b.WriteString("\n")
-	b.WriteString(statusBar.Render("  enter: connect   esc: back   ctrl-c: quit"))
-	return b.String()
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// formatHostRow renders one host's name, hostname, and tags.
+func formatHostRow(h config.Host) string {
+	row := fmt.Sprintf("%-16s %-18s", h.Name, h.HostName)
+	if len(h.Tags) > 0 {
+		row += sty.tag.Render("  [" + strings.Join(h.Tags, ",") + "]")
+	}
+	return row
 }
