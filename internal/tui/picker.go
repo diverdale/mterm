@@ -133,18 +133,21 @@ func (p *picker) View() string {
 		if i == p.cursor {
 			b.WriteString(sty.selectionBar.Render("> " + row))
 		} else {
-			b.WriteString(sty.dim.Render("  ") + row)
+			b.WriteString(sty.dim.Render("  " + row))
 		}
 		b.WriteString("\n")
 	}
 	return strings.TrimRight(b.String(), "\n")
 }
 
-// formatHostRow renders one host's name, hostname, and tags.
+// formatHostRow renders one host's name, hostname, and tags as PLAIN text.
+// The caller wraps the whole row in a single style (the selection bar or the
+// dim style); embedding styling here would break that wrapping style's
+// background, so this returns no ANSI.
 func formatHostRow(h config.Host) string {
 	row := fmt.Sprintf("%-16s %-18s", h.Name, h.HostName)
 	if len(h.Tags) > 0 {
-		row += sty.tag.Render("  [" + strings.Join(h.Tags, ",") + "]")
+		row += "  [" + strings.Join(h.Tags, ",") + "]"
 	}
 	return row
 }
