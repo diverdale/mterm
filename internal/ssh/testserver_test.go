@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -78,8 +79,12 @@ func (s *testServer) handle(conn net.Conn) {
 	defer sc.Close()
 	go ssh.DiscardRequests(reqs)
 	for nc := range chans {
+		if nc.ChannelType() == "direct-tcpip" {
+			go handleDirectTCPIP(nc)
+			continue
+		}
 		if nc.ChannelType() != "session" {
-			nc.Reject(ssh.UnknownChannelType, "only session")
+			nc.Reject(ssh.UnknownChannelType, "unsupported channel")
 			continue
 		}
 		ch, chReqs, err := nc.Accept()
@@ -108,4 +113,35 @@ func (s *testServer) handle(conn net.Conn) {
 		}()
 		go func() { io.Copy(ch, ch); ch.Close() }() // echo stdin -> stdout
 	}
+}
+
+// directTCPIPPayload mirrors the RFC 4254 direct-tcpip channel request.
+type directTCPIPPayload struct {
+	DestAddr   string
+	DestPort   uint32
+	OriginAddr string
+	OriginPort uint32
+}
+
+// handleDirectTCPIP dials the requested destination and pipes bytes both ways.
+func handleDirectTCPIP(nc ssh.NewChannel) {
+	var p directTCPIPPayload
+	if err := ssh.Unmarshal(nc.ExtraData(), &p); err != nil {
+		nc.Reject(ssh.ConnectionFailed, "bad payload")
+		return
+	}
+	dest := net.JoinHostPort(p.DestAddr, fmt.Sprintf("%d", p.DestPort))
+	target, err := net.Dial("tcp", dest)
+	if err != nil {
+		nc.Reject(ssh.ConnectionFailed, err.Error())
+		return
+	}
+	ch, reqs, err := nc.Accept()
+	if err != nil {
+		target.Close()
+		return
+	}
+	go ssh.DiscardRequests(reqs)
+	go func() { io.Copy(ch, target); ch.Close() }()
+	go func() { io.Copy(target, ch); target.Close() }()
 }
