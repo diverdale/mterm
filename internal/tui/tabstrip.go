@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // statusGlyph returns the colored glyph for a tab's connection status. While
@@ -33,6 +34,8 @@ func renderTabStrip(tabs []*sessionTab, activeIdx, spinnerCounter, width int) st
 		}
 	}
 	strip := lipgloss.JoinHorizontal(lipgloss.Top, chips...)
-	// Pad or truncate to exactly width so the frame stays aligned.
-	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(strip)
+	// Hard-truncate to width (ANSI-aware) so the result is always one line;
+	// lipgloss MaxWidth word-wraps rather than truncating.
+	strip = ansi.Truncate(strip, width, "")
+	return lipgloss.NewStyle().Width(width).Render(strip)
 }
