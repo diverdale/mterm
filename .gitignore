@@ -1,0 +1,4 @@
+/mterm
+*.test
+*.out
+.DS_Store
