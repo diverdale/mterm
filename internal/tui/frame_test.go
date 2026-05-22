@@ -59,3 +59,27 @@ func TestWindowWithTabStrip(t *testing.T) {
 		t.Fatalf("window with tab strip has %d lines, want 12", got)
 	}
 }
+
+func TestWindowMinHeightNoTab(t *testing.T) {
+	out := renderWindow(windowOpts{
+		title: "t", body: "b", footer: "f", width: 20, height: 4,
+	})
+	lines := strings.Split(out, "\n")
+	if len(lines) != 4 {
+		t.Fatalf("no-tab window at height 4 produced %d lines, want 4", len(lines))
+	}
+	for i, ln := range lines {
+		if w := lipgloss.Width(ln); w != 20 {
+			t.Fatalf("line %d width = %d, want 20", i, w)
+		}
+	}
+}
+
+func TestWindowShortWithTab(t *testing.T) {
+	out := renderWindow(windowOpts{
+		title: "t", tabStrip: "tabs", body: "b", footer: "f", width: 20, height: 5,
+	})
+	if got := len(strings.Split(out, "\n")); got != 5 {
+		t.Fatalf("with-tab window at height 5 produced %d lines, want 5", got)
+	}
+}
