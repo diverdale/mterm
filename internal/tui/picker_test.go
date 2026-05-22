@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"mterm/internal/config"
 )
 
@@ -122,6 +123,24 @@ func TestPickerViewEmptyDoesNotPanic(t *testing.T) {
 	if len(p2.visibleHosts()) != 0 {
 		t.Fatal("visibleHosts() with no-match query should be empty")
 	}
+}
+
+func TestPickerSelectionBarIsFullWidth(t *testing.T) {
+	p := newPicker(sampleHosts())
+	p.setSize(80, 24)
+	out := p.View()
+	// The cursor starts at row 0; find the rendered line for the first host
+	// and confirm it spans the full picker width.
+	h0 := p.visibleHosts()[0]
+	for _, ln := range strings.Split(out, "\n") {
+		if strings.Contains(ln, h0.Name) {
+			if w := lipgloss.Width(ln); w != p.w {
+				t.Fatalf("selection bar width = %d, want %d (full width)", w, p.w)
+			}
+			return
+		}
+	}
+	t.Fatal("could not find the selected host row in the picker view")
 }
 
 func TestPickerViewHasSelectionAndGroups(t *testing.T) {

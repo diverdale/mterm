@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 
 	"mterm/internal/config"
 )
@@ -131,7 +132,8 @@ func (p *picker) View() string {
 		}
 		row := formatHostRow(h)
 		if i == p.cursor {
-			b.WriteString(sty.selectionBar.Render("> " + row))
+			line := ansi.Truncate("> "+row, p.w, "")
+			b.WriteString(sty.selectionBar.Width(p.w).Render(line))
 		} else {
 			b.WriteString(sty.dim.Render("  " + row))
 		}

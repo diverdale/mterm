@@ -43,12 +43,10 @@ type styleSet struct {
 	prefixBadge  lipgloss.Style // PREFIX badge
 	selectionBar lipgloss.Style // picker cursor row
 	groupHeader  lipgloss.Style // picker group header
-	tag          lipgloss.Style // picker host tags
 	search       lipgloss.Style // picker search query text
 	errorText    lipgloss.Style // error messages
 	connected    lipgloss.Style // green status glyph
 	dim          lipgloss.Style // generic secondary text
-	modalBorder  lipgloss.Style // forwards modal border color
 }
 
 // active is the current theme. v1 has no runtime switcher.
@@ -72,11 +70,9 @@ func buildStyles(t Theme) styleSet {
 		prefixBadge:  lipgloss.NewStyle().Background(t.Accent).Foreground(onAccent).Bold(true).Padding(0, 1),
 		selectionBar: lipgloss.NewStyle().Background(t.Accent).Foreground(onAccent),
 		groupHeader:  lipgloss.NewStyle().Foreground(t.Dim).Bold(true),
-		tag:          lipgloss.NewStyle().Foreground(t.Dim),
 		search:       lipgloss.NewStyle().Foreground(t.Accent),
 		errorText:    lipgloss.NewStyle().Foreground(t.Error),
 		connected:    lipgloss.NewStyle().Foreground(t.Connected),
 		dim:          lipgloss.NewStyle().Foreground(t.Dim),
-		modalBorder:  lipgloss.NewStyle().Foreground(t.Accent),
 	}
 }
