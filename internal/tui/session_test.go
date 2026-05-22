@@ -20,9 +20,23 @@ func TestSessionTabResizeUpdatesTerminal(t *testing.T) {
 	tab := newSessionTab(1, config.Host{Name: "h"}, 80, 24)
 	tab.resize(100, 30)
 	w, h := tab.term.Size()
-	// Terminal height is the tab body: total rows minus the tab bar row.
-	if w != 100 || h != 29 {
-		t.Fatalf("terminal size = %d,%d want 100,29", w, h)
+	// Body is the inner window area: width minus side borders, height minus
+	// the 5 chrome rows (top border, tab strip, divider, footer, bottom border).
+	if w != 100-chromeCols || h != 30-chromeRows {
+		t.Fatalf("terminal size = %d,%d want %d,%d", w, h, 100-chromeCols, 30-chromeRows)
+	}
+}
+
+func TestSessionTabStatus(t *testing.T) {
+	tab := newSessionTab(1, config.Host{Name: "h"}, 80, 24)
+	// No session attached yet → connecting.
+	if got := tab.status(); got != statusConnecting {
+		t.Fatalf("status with no session = %v, want statusConnecting", got)
+	}
+	// After the reader goroutine has marked the tab ended → failed.
+	tab.ended.Store(true)
+	if got := tab.status(); got != statusFailed {
+		t.Fatalf("status after ended = %v, want statusFailed", got)
 	}
 }
 

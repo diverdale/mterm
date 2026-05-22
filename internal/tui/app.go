@@ -192,12 +192,9 @@ func (a *App) openTab(host config.Host) tea.Cmd {
 		return nil
 	}
 	connect := a.connect
-	w, bodyH := a.width, a.height-tabBarRows
-	if bodyH < 1 {
-		bodyH = 1
-	}
+	bodyW, bodyH := h2body(a.width, a.height)
 	return func() tea.Msg {
-		sess, err := connect(host, w, bodyH)
+		sess, err := connect(host, bodyW, bodyH)
 		return connectedMsg{tabID: id, sess: sess, err: err}
 	}
 }

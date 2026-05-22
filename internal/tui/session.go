@@ -8,8 +8,35 @@ import (
 	"mterm/internal/terminal"
 )
 
-// tabBarRows is the height reserved for the tab bar.
-const tabBarRows = 1
+// chromeCols and chromeRows are the screen space the window frame reserves
+// around a session's terminal body: left+right borders, and (top border, tab
+// strip, divider, footer, bottom border) respectively.
+const (
+	chromeCols = 2
+	chromeRows = 5
+)
+
+// tabStatus is a session tab's connection state, derived from the tab.
+type tabStatus int
+
+const (
+	statusConnecting tabStatus = iota
+	statusConnected
+	statusFailed
+)
+
+// status derives the tab's connection state. A live session is connected; a
+// tab whose reader goroutine has exited (the session ended or never connected)
+// is failed; otherwise it is still connecting.
+func (t *sessionTab) status() tabStatus {
+	if t.sess.Load() != nil {
+		return statusConnected
+	}
+	if t.ended.Load() {
+		return statusFailed
+	}
+	return statusConnecting
+}
 
 // sessionTab is one connection tab: an ssh.Session feeding a terminal emulator.
 type sessionTab struct {
@@ -23,14 +50,11 @@ type sessionTab struct {
 
 // newSessionTab creates a tab sized to the given total area.
 func newSessionTab(id int, host config.Host, w, h int) *sessionTab {
-	bodyH := h - tabBarRows
-	if bodyH < 1 {
-		bodyH = 1
-	}
+	bodyW, bodyH := h2body(w, h)
 	return &sessionTab{
 		id:   id,
 		host: host,
-		term: terminal.New(w, bodyH),
+		term: terminal.New(bodyW, bodyH),
 		w:    w,
 		h:    h,
 	}
@@ -75,13 +99,10 @@ func (t *sessionTab) readLoop() {
 // resize updates both the tab area and the underlying terminal/PTY.
 func (t *sessionTab) resize(w, h int) {
 	t.w, t.h = w, h
-	bodyH := h - tabBarRows
-	if bodyH < 1 {
-		bodyH = 1
-	}
-	t.term.Resize(w, bodyH)
+	bodyW, bodyH := h2body(w, h)
+	t.term.Resize(bodyW, bodyH)
 	if s := t.sess.Load(); s != nil {
-		_ = s.Resize(w, bodyH)
+		_ = s.Resize(bodyW, bodyH)
 	}
 }
 
@@ -103,4 +124,17 @@ func (t *sessionTab) close() {
 		_ = s.Close()
 	}
 	t.sess.Store(nil)
+}
+
+// h2body converts a full tab area (w, h) into the inner terminal body size,
+// clamped to a minimum of 1×1.
+func h2body(w, h int) (int, int) {
+	bw, bh := w-chromeCols, h-chromeRows
+	if bw < 1 {
+		bw = 1
+	}
+	if bh < 1 {
+		bh = 1
+	}
+	return bw, bh
 }

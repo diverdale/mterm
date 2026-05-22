@@ -127,11 +127,11 @@ func TestAppWindowResizePropagates(t *testing.T) {
 		t.Fatalf("app.height = %d, want 40", app.height)
 	}
 	w, h := app.tabs[0].term.Size()
-	if w != 100 {
-		t.Fatalf("term width = %d, want 100", w)
+	if w != 100-chromeCols {
+		t.Fatalf("term width = %d, want %d", w, 100-chromeCols)
 	}
-	if h != 39 {
-		t.Fatalf("term height = %d, want 39 (40 - 1 tab bar row)", h)
+	if h != 40-chromeRows {
+		t.Fatalf("term height = %d, want %d (40 - %d chrome rows)", h, 40-chromeRows, chromeRows)
 	}
 }
 
