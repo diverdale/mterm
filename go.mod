@@ -1,6 +1,12 @@
 module mterm
 
-go 1.25
+go 1.25.0
+
+require (
+	github.com/charmbracelet/x/vt v0.0.0-20260519012233-798e623c8447
+	github.com/kevinburke/ssh_config v1.6.0
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/atotto/clipboard v0.1.4 // indirect
@@ -18,13 +24,11 @@ require (
 	github.com/charmbracelet/x/exp/teatest v0.0.0-20260519012233-798e623c8447 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
-	github.com/charmbracelet/x/vt v0.0.0-20260519012233-798e623c8447 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
-	github.com/kevinburke/ssh_config v1.6.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
@@ -38,5 +42,4 @@ require (
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
