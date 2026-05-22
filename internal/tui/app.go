@@ -275,7 +275,11 @@ func (a *App) handleConnected(m connectedMsg) {
 func (a *App) View() string {
 	switch a.mode {
 	case modePicker:
-		return a.picker.View()
+		v := a.picker.View()
+		if a.statusMsg != "" {
+			v += "\n" + errorText.Render("  "+a.statusMsg)
+		}
+		return v
 	case modeForwards:
 		return a.forwards.View()
 	case modeSession:

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -224,5 +225,24 @@ func TestAppConnectErrorSetsAndClearsStatus(t *testing.T) {
 
 	if app.statusMsg != "" {
 		t.Fatalf("statusMsg = %q, want empty after successful open (fix #2)", app.statusMsg)
+	}
+}
+
+func TestAppPickerViewShowsConnectError(t *testing.T) {
+	failConnect := func(config.Host, int, int) (*mssh.Session, error) {
+		return nil, errors.New("kaboom")
+	}
+	app := NewApp(sampleHosts(), failConnect)
+	app.width, app.height = 80, 24
+
+	// A failed connect removes the only tab and returns to the picker.
+	cmd := app.update(pickerChosenMsg{host: sampleHosts()[0]})
+	app.update(cmd())
+
+	if app.mode != modePicker {
+		t.Fatalf("mode = %v, want modePicker after failed connect", app.mode)
+	}
+	if !strings.Contains(app.View(), "kaboom") {
+		t.Fatalf("picker View must surface the connect error, got:\n%s", app.View())
 	}
 }
