@@ -134,3 +134,39 @@ func TestRenderIncludesColor(t *testing.T) {
 		t.Fatalf("Render() plain text does not contain 'red'; got %q", out)
 	}
 }
+
+// reverseVideoRE matches the SGR reverse-video attribute (\x1b[7m).
+// We match specifically on 7 (or sequences containing 7;... / ...;7)
+// to confirm a reverse-video cursor was drawn.
+var reverseVideoRE = regexp.MustCompile(`\x1b\[[0-9;]*7[0-9;]*m|\x1b\[7m`)
+
+// TestRenderDrawsCursor verifies that Render() draws a reverse-video block
+// cursor at the cursor position when the cursor is visible (DECTCEM default).
+func TestRenderDrawsCursor(t *testing.T) {
+	term := New(20, 5)
+	// Write some text so the cursor moves to a non-zero column.
+	if _, err := term.Write([]byte("hello")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	out := term.Render()
+	// The output must contain a reverse-video SGR sequence (\x1b[7m or
+	// equivalent) because the cursor cell is rendered with reverse video.
+	if !reverseVideoRE.MatchString(out) {
+		t.Fatalf("Render() does not contain a reverse-video cursor; got %q", out)
+	}
+}
+
+// TestHiddenCursorNotDrawn verifies that when the remote application hides the
+// cursor via \x1b[?25l (DECTCEM reset), Render() does NOT emit a reverse-video
+// cursor block.
+func TestHiddenCursorNotDrawn(t *testing.T) {
+	term := New(20, 5)
+	// Write text and then hide the cursor.
+	if _, err := term.Write([]byte("hello\x1b[?25l")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	out := term.Render()
+	if reverseVideoRE.MatchString(out) {
+		t.Fatalf("Render() drew a cursor even though DECTCEM is reset; got %q", out)
+	}
+}
