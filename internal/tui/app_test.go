@@ -274,3 +274,28 @@ func TestAppReapsEndedTabs(t *testing.T) {
 		t.Fatalf("after last tab ends: tabs=%d mode=%v, want 0/modePicker", len(app.tabs), app.mode)
 	}
 }
+
+func TestAppViewIsFramed(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	out := app.View() // picker mode
+	lines := strings.Split(out, "\n")
+	if len(lines) != 24 {
+		t.Fatalf("framed picker view has %d lines, want 24", len(lines))
+	}
+	if !strings.Contains(lines[0], "┌") {
+		t.Fatalf("picker view is not framed; line 0 = %q", lines[0])
+	}
+	if !strings.Contains(out, "mterm") {
+		t.Fatal("picker frame title should say mterm")
+	}
+}
+
+func TestAppSpinnerCounterAdvances(t *testing.T) {
+	app := newTestApp()
+	before := app.tickCount
+	app.update(tickMsg{})
+	if app.tickCount != before+1 {
+		t.Fatalf("tickCount = %d, want %d", app.tickCount, before+1)
+	}
+}

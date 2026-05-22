@@ -70,18 +70,16 @@ func sideRow(content string, innerWidth int) string {
 	return bar + clampLine(content, innerWidth) + bar
 }
 
-// topBorder builds "┌─ title ─────┐" exactly width wide.
+// topBorder builds "┌─ title ─────┐" exactly width wide. title is placed
+// as-is; the caller pre-styles it.
 func topBorder(title string, width int) string {
-	styled := sty.title.Render(title)
 	prefix := "┌─ "
-	// 3 (prefix) + titleW + 1 (space) + fill + 1 ("┐") == width
-	fill := width - lipgloss.Width(prefix) - lipgloss.Width(styled) - 2
+	fill := width - lipgloss.Width(prefix) - lipgloss.Width(title) - 2
 	if fill < 0 {
 		fill = 0
 	}
-	line := sty.border.Render(prefix) + styled +
+	line := sty.border.Render(prefix) + title +
 		sty.border.Render(" "+strings.Repeat("─", fill)+"┐")
-	// When the title is too long fill is 0 and line exceeds width; truncate.
 	return ansi.Truncate(line, width, "")
 }
 

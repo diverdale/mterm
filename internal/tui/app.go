@@ -2,10 +2,10 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"mterm/internal/config"
 	mssh "mterm/internal/ssh"
@@ -52,6 +52,7 @@ type App struct {
 
 	width, height int
 	statusMsg     string
+	tickCount     int // render-tick counter, drives status spinners
 }
 
 // NewApp builds the root model.
@@ -79,6 +80,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (a *App) update(msg tea.Msg) tea.Cmd {
 	switch m := msg.(type) {
 	case tickMsg:
+		a.tickCount++
 		a.reapEndedTabs()
 		return tea.Tick(renderInterval, func(time.Time) tea.Msg { return tickMsg{} })
 
@@ -281,47 +283,89 @@ func (a *App) handleConnected(m connectedMsg) {
 	a.tabs[idx].attach(m.sess)
 }
 
-// View renders the current view.
+// View renders the current view as a framed window.
 func (a *App) View() string {
+	if a.width < 1 || a.height < 1 {
+		return ""
+	}
 	switch a.mode {
-	case modePicker:
-		v := a.picker.View()
-		if a.statusMsg != "" {
-			v += "\n" + errorText.Render("  "+a.statusMsg)
-		}
-		return v
 	case modeForwards:
-		return a.forwards.View()
+		return a.forwardsView()
 	case modeSession:
 		return a.sessionView()
+	default:
+		return a.pickerView()
 	}
-	return ""
+}
+
+// clock returns the current HH:MM string for the footer.
+func clock() string { return time.Now().Format("15:04") }
+
+func (a *App) pickerView() string {
+	a.picker.setSize(a.width-chromeCols, a.height-4)
+	footer := renderFooter(footerOpts{
+		hints: []keyHint{{"enter", "connect"}, {"type", "filter"}, {"esc", "back"}},
+		info:  fmt.Sprintf("%d hosts", len(a.picker.all)),
+		clock: clock(),
+		width: a.width - 2,
+	})
+	body := a.picker.View()
+	if a.statusMsg != "" {
+		body += "\n" + sty.errorText.Render("  "+a.statusMsg)
+	}
+	return renderWindow(windowOpts{
+		title:  sty.title.Render("mterm"),
+		body:   body,
+		footer: footer,
+		width:  a.width,
+		height: a.height,
+	})
 }
 
 func (a *App) sessionView() string {
 	t := a.activeTab()
 	if t == nil {
-		return "no active session"
+		return a.pickerView()
 	}
-	return a.tabBar() + "\n" + t.View()
+	title := statusGlyph(t.status(), a.tickCount) + " " +
+		sty.title.Render(t.title()) + statusCount(len(a.tabs))
+	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2)
+	footer := renderFooter(footerOpts{
+		hints:         []keyHint{{"^B", "menu"}, {"^B n", "next"}, {"^B x", "close"}},
+		info:          sessionInfo(t.host),
+		clock:         clock(),
+		prefixPending: a.prefixPending,
+		width:         a.width - 2,
+	})
+	return renderWindow(windowOpts{
+		title:    title,
+		tabStrip: tabs,
+		body:     t.View(),
+		footer:   footer,
+		width:    a.width,
+		height:   a.height,
+	})
 }
 
-func (a *App) tabBar() string {
-	var parts []string
-	for i, t := range a.tabs {
-		label := fmt.Sprintf("%d:%s", i+1, t.title())
-		if i == a.active {
-			parts = append(parts, tabActive.Render(label))
-		} else {
-			parts = append(parts, tabInactive.Render(label))
-		}
+func (a *App) forwardsView() string {
+	return lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center,
+		a.forwards.View())
+}
+
+// statusCount renders the " [N tabs]" suffix for the window title.
+func statusCount(n int) string {
+	noun := "tabs"
+	if n == 1 {
+		noun = "tab"
 	}
-	bar := strings.Join(parts, " ")
-	if a.prefixPending {
-		bar += "  " + statusBar.Render("[prefix]")
+	return sty.titleDim.Render(fmt.Sprintf("  [%d %s]", n, noun))
+}
+
+// sessionInfo renders user@host:port for the footer.
+func sessionInfo(h config.Host) string {
+	user := h.User
+	if user == "" {
+		user = "?"
 	}
-	if a.statusMsg != "" {
-		bar += "  " + errorText.Render(a.statusMsg)
-	}
-	return bar
+	return fmt.Sprintf("%s@%s:%d", user, h.HostName, h.Port)
 }
