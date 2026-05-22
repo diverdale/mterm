@@ -80,6 +80,77 @@ func TestMergeBadYAMLIsWarningNotFatal(t *testing.T) {
 	}
 }
 
+func TestMergeEmptyNameHostIsWarning(t *testing.T) {
+	sshPath := writeTemp(t, "config", "")
+	mtermPath := writeTemp(t, "hosts.yaml", `
+hosts:
+  - name: ""
+    group: orphan
+  - name: valid-host
+    hostName: 1.2.3.4
+`)
+
+	res, err := loadAndMerge(sshPath, mtermPath)
+	if err != nil {
+		t.Fatalf("loadAndMerge: %v", err)
+	}
+	if len(res.Warnings) == 0 {
+		t.Fatal("want a warning for host with empty name, got none")
+	}
+	for _, h := range res.Hosts {
+		if h.Name == "" {
+			t.Fatalf("host with empty name must not be added to results: %+v", h)
+		}
+	}
+	if len(res.Hosts) != 1 {
+		t.Fatalf("want exactly 1 host (valid-host), got %d: %+v", len(res.Hosts), res.Hosts)
+	}
+}
+
+func TestMergeOverlayUserPortAndEmptyGroup(t *testing.T) {
+	sshPath := writeTemp(t, "config", `
+Host bastion
+    HostName bastion.example.com
+    User ubuntu
+    Port 22
+`)
+	mtermPath := writeTemp(t, "hosts.yaml", `
+hosts:
+  - name: bastion
+    user: ec2-user
+    port: 2222
+`)
+
+	res, err := loadAndMerge(sshPath, mtermPath)
+	if err != nil {
+		t.Fatalf("loadAndMerge: %v", err)
+	}
+	if len(res.Warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", res.Warnings)
+	}
+
+	var bastion *Host
+	for i := range res.Hosts {
+		if res.Hosts[i].Name == "bastion" {
+			bastion = &res.Hosts[i]
+			break
+		}
+	}
+	if bastion == nil {
+		t.Fatal("bastion host missing from results")
+	}
+	if bastion.User != "ec2-user" {
+		t.Fatalf("mterm user override not applied: got %q, want %q", bastion.User, "ec2-user")
+	}
+	if bastion.Port != 2222 {
+		t.Fatalf("mterm port override not applied: got %d, want 2222", bastion.Port)
+	}
+	// mterm entry omits group: existing Group (empty string) must be unchanged.
+	if bastion.Group != "" {
+		t.Fatalf("applyOverlay must not clobber existing Group with empty mterm value: got %q", bastion.Group)
+	}
+}
+
 func TestMergeSortedByGroupThenName(t *testing.T) {
 	sshPath := writeTemp(t, "config", "")
 	mtermPath := writeTemp(t, "hosts.yaml", `

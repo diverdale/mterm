@@ -78,7 +78,9 @@ func loadAndMerge(sshPath, mtermPath string) (*Result, error) {
 // applyOverlay attaches mterm metadata to an existing ssh_config host.
 // mterm-provided non-zero values win; the ssh_config source is preserved.
 func applyOverlay(h *Host, mh mtermHost) {
-	h.Group = mh.Group
+	if mh.Group != "" {
+		h.Group = mh.Group
+	}
 	if len(mh.Tags) > 0 {
 		h.Tags = mh.Tags
 	}
