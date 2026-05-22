@@ -32,7 +32,6 @@ type Connector func(config.Host, int, int) (*mssh.Session, error)
 
 // App is the root Bubble Tea model.
 type App struct {
-	hosts   []config.Host
 	connect Connector
 
 	mode          viewMode
@@ -51,7 +50,6 @@ type App struct {
 // NewApp builds the root model.
 func NewApp(hosts []config.Host, connect Connector) *App {
 	return &App{
-		hosts:   hosts,
 		connect: connect,
 		mode:    modePicker,
 		picker:  newPicker(hosts),
@@ -171,6 +169,7 @@ func keyString(k tea.KeyMsg) string {
 
 // openTab connects to a host and adds a new tab.
 func (a *App) openTab(host config.Host) tea.Cmd {
+	a.statusMsg = ""
 	tab := newSessionTab(a.nextID, host, a.width, a.height)
 	a.nextID++
 	if a.connect != nil {

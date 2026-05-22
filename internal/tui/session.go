@@ -13,12 +13,11 @@ const tabBarRows = 1
 
 // sessionTab is one connection tab: an ssh.Session feeding a terminal emulator.
 type sessionTab struct {
-	id    int
-	host  config.Host
-	term  *terminal.Terminal
-	sess  atomic.Pointer[mssh.Session] // nil until connected
-	dirty atomic.Bool                  // set by the reader goroutine, cleared on render
-	w, h  int                          // full tab area including the tab bar
+	id   int
+	host config.Host
+	term *terminal.Terminal
+	sess atomic.Pointer[mssh.Session] // nil until connected
+	w, h int                          // full tab area including the tab bar
 }
 
 // newSessionTab creates a tab sized to the given total area.
@@ -57,10 +56,8 @@ func (t *sessionTab) readLoop() {
 		n, err := s.Read(buf)
 		if n > 0 {
 			t.term.Write(buf[:n])
-			t.dirty.Store(true)
 		}
 		if err != nil {
-			t.dirty.Store(true)
 			return
 		}
 	}
