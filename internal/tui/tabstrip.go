@@ -28,9 +28,12 @@ func renderTabStrip(tabs []*sessionTab, activeIdx, spinnerCounter, width int) st
 	for i, t := range tabs {
 		label := fmt.Sprintf("%s %d %s", statusGlyph(t.status(), spinnerCounter), i+1, t.title())
 		if i == activeIdx {
-			chips = append(chips, sty.tabActive.Render(label))
+			// The active tab is outlined with brackets; inactive tabs use
+			// matching blank padding so a tab's label does not shift when it
+			// gains or loses focus.
+			chips = append(chips, sty.tabActive.Render("[ "+label+" ]"))
 		} else {
-			chips = append(chips, sty.tabInactive.Render(label))
+			chips = append(chips, sty.tabInactive.Render("  "+label+"  "))
 		}
 	}
 	strip := lipgloss.JoinHorizontal(lipgloss.Top, chips...)

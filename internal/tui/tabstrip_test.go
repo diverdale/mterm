@@ -56,3 +56,15 @@ func TestTabStripStylesTabs(t *testing.T) {
 		t.Fatalf("tab strip must be styled (ANSI escape codes), got: %q", out)
 	}
 }
+
+func TestTabStripActiveTabBracketed(t *testing.T) {
+	tabs := []*sessionTab{
+		newSessionTab(1, config.Host{Name: "alpha"}, 80, 24),
+		newSessionTab(2, config.Host{Name: "beta"}, 80, 24),
+	}
+	out := renderTabStrip(tabs, 0, 0, 80)
+	// The active tab is outlined with brackets.
+	if !strings.Contains(out, "[ ") || !strings.Contains(out, " ]") {
+		t.Fatalf("active tab should be bracketed, got:\n%s", out)
+	}
+}
