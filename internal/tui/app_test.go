@@ -160,19 +160,36 @@ func TestAppOpenTabViaConnector(t *testing.T) {
 	}
 	app := NewApp(sampleHosts(), connect)
 	app.width, app.height = 80, 24
-	app.update(pickerChosenMsg{host: sampleHosts()[0]})
 
-	if !called {
-		t.Fatal("connector was not called")
-	}
+	// Tab is created synchronously; connection happens in the returned cmd.
+	cmd := app.update(pickerChosenMsg{host: sampleHosts()[0]})
 	if len(app.tabs) != 1 {
-		t.Fatalf("len(tabs) = %d, want 1", len(app.tabs))
+		t.Fatalf("len(tabs) = %d, want 1 after openTab", len(app.tabs))
 	}
 	if app.mode != modeSession {
 		t.Fatalf("mode = %v, want modeSession", app.mode)
 	}
 	if app.active != 0 {
 		t.Fatalf("active = %d, want 0", app.active)
+	}
+	if cmd == nil {
+		t.Fatal("openTab must return a non-nil cmd when a connector is set")
+	}
+
+	// Run the cmd to trigger the actual connection.
+	msg := cmd()
+	if !called {
+		t.Fatal("connector was not called")
+	}
+	cm, ok := msg.(connectedMsg)
+	if !ok {
+		t.Fatalf("cmd() returned %T, want connectedMsg", msg)
+	}
+
+	// Deliver the result; tab stays (stub returns nil session, no error).
+	app.update(cm)
+	if len(app.tabs) != 1 {
+		t.Fatalf("len(tabs) = %d, want 1 after connectedMsg", len(app.tabs))
 	}
 }
 
@@ -183,13 +200,23 @@ func TestAppConnectErrorSetsAndClearsStatus(t *testing.T) {
 	}
 	app := NewApp(sampleHosts(), failConnect)
 	app.width, app.height = 80, 24
-	app.update(pickerChosenMsg{host: sampleHosts()[0]})
+
+	// Drive the async flow: open → run cmd → deliver connectedMsg.
+	cmd := app.update(pickerChosenMsg{host: sampleHosts()[0]})
+	msg := cmd()
+	app.update(msg)
 
 	if app.statusMsg == "" {
 		t.Fatal("statusMsg should be set after a connect error")
 	}
+	if len(app.tabs) != 0 {
+		t.Fatalf("len(tabs) = %d, want 0 after connect error", len(app.tabs))
+	}
+	if app.mode != modePicker {
+		t.Fatalf("mode = %v, want modePicker after connect error removes last tab", app.mode)
+	}
 
-	// Now switch to a connector that succeeds and open another tab.
+	// Now switch to a connector that succeeds; statusMsg should clear on next open.
 	app.connect = func(config.Host, int, int) (*mssh.Session, error) {
 		return nil, nil
 	}

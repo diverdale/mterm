@@ -26,6 +26,13 @@ const renderInterval = 33 * time.Millisecond
 // tickMsg drives periodic re-renders so session output is coalesced.
 type tickMsg struct{}
 
+// connectedMsg delivers the result of an asynchronous connection attempt.
+type connectedMsg struct {
+	tabID int
+	sess  *mssh.Session
+	err   error
+}
+
 // Connector turns a host into a connected session. main.go supplies the real
 // implementation; tests may pass nil and avoid connecting.
 type Connector func(config.Host, int, int) (*mssh.Session, error)
@@ -97,6 +104,10 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 	case forwardsClosedMsg:
 		a.mode = modeSession
 		return nil
+
+	case connectedMsg:
+		a.handleConnected(m)
+		return nil
 	}
 	return nil
 }
@@ -104,7 +115,7 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 func (a *App) handleKey(k tea.KeyMsg) tea.Cmd {
 	// Ctrl-C always quits.
 	if k.Type == tea.KeyCtrlC {
-		return tea.Quit
+		return a.shutdown()
 	}
 
 	switch a.mode {
@@ -149,7 +160,7 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 			a.mode = modeForwards
 		}
 	case "q":
-		return tea.Quit
+		return a.shutdown()
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		idx := int(k.Runes[0] - '1')
 		if idx < len(a.tabs) {
@@ -167,27 +178,27 @@ func keyString(k tea.KeyMsg) string {
 	return ""
 }
 
-// openTab connects to a host and adds a new tab.
+// openTab creates a tab for host and kicks off an async connection.
 func (a *App) openTab(host config.Host) tea.Cmd {
 	a.statusMsg = ""
-	tab := newSessionTab(a.nextID, host, a.width, a.height)
+	id := a.nextID
 	a.nextID++
-	if a.connect != nil {
-		bodyH := a.height - tabBarRows
-		if bodyH < 1 {
-			bodyH = 1
-		}
-		sess, err := a.connect(host, a.width, bodyH)
-		if err != nil {
-			a.statusMsg = fmt.Sprintf("connect %s: %v", host.Name, err)
-		} else {
-			tab.attach(sess)
-		}
-	}
+	tab := newSessionTab(id, host, a.width, a.height)
 	a.tabs = append(a.tabs, tab)
 	a.active = len(a.tabs) - 1
 	a.mode = modeSession
-	return nil
+	if a.connect == nil {
+		return nil
+	}
+	connect := a.connect
+	w, bodyH := a.width, a.height-tabBarRows
+	if bodyH < 1 {
+		bodyH = 1
+	}
+	return func() tea.Msg {
+		sess, err := connect(host, w, bodyH)
+		return connectedMsg{tabID: id, sess: sess, err: err}
+	}
 }
 
 func (a *App) activeTab() *sessionTab {
@@ -204,13 +215,13 @@ func (a *App) cycleTab(delta int) {
 	a.active = (a.active + delta + len(a.tabs)) % len(a.tabs)
 }
 
-func (a *App) closeActiveTab() {
-	t := a.activeTab()
-	if t == nil {
+// removeTabAt closes and removes the tab at index idx.
+func (a *App) removeTabAt(idx int) {
+	if idx < 0 || idx >= len(a.tabs) {
 		return
 	}
-	t.close()
-	a.tabs = append(a.tabs[:a.active], a.tabs[a.active+1:]...)
+	a.tabs[idx].close()
+	a.tabs = append(a.tabs[:idx], a.tabs[idx+1:]...)
 	if a.active >= len(a.tabs) {
 		a.active = len(a.tabs) - 1
 	}
@@ -218,6 +229,46 @@ func (a *App) closeActiveTab() {
 		a.mode = modePicker
 		a.picker.setQuery("")
 	}
+}
+
+func (a *App) closeActiveTab() {
+	if a.activeTab() == nil {
+		return
+	}
+	a.removeTabAt(a.active)
+}
+
+// shutdown closes every open session before ending the program.
+func (a *App) shutdown() tea.Cmd {
+	for _, t := range a.tabs {
+		t.close()
+	}
+	a.tabs = nil
+	return tea.Quit
+}
+
+// handleConnected applies the result of an async connection attempt.
+func (a *App) handleConnected(m connectedMsg) {
+	idx := -1
+	for i, t := range a.tabs {
+		if t.id == m.tabID {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		// Tab was closed before the connection resolved — don't leak it.
+		if m.sess != nil {
+			m.sess.Close()
+		}
+		return
+	}
+	if m.err != nil {
+		a.statusMsg = fmt.Sprintf("connect %s: %v", a.tabs[idx].host.Name, m.err)
+		a.removeTabAt(idx)
+		return
+	}
+	a.tabs[idx].attach(m.sess)
 }
 
 // View renders the current view.
