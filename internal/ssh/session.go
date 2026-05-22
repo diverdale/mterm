@@ -159,6 +159,12 @@ func (s *Session) Connect(cols, rows int) error {
 	}
 
 	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		sess.Close()
+		client.Close()
+		return fmt.Errorf("session closed during connect")
+	}
 	s.client = client
 	s.sess = sess
 	s.stdin = stdin

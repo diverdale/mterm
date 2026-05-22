@@ -3,6 +3,8 @@ package ssh
 import (
 	"testing"
 	"time"
+
+	"mterm/internal/config"
 )
 
 func TestBackoffGrowsAndCaps(t *testing.T) {
@@ -48,5 +50,37 @@ func TestReconnectRestoresSession(t *testing.T) {
 	}
 	if _, err := s.Write([]byte("hi\n")); err != nil {
 		t.Fatalf("write after reconnect: %v", err)
+	}
+}
+
+func TestAutoReconnectStopsWhenClosed(t *testing.T) {
+	host := config.Host{Name: "x", HostName: "127.0.0.1"}
+	s := NewSession(host, noAuth{}, insecureHostKey())
+	s.dialAddr = "127.0.0.1:1"
+	s.Close() // user closes before any reconnect attempt
+
+	done := make(chan error, 1)
+	go func() { done <- s.AutoReconnect(80, 24, 0) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("AutoReconnect on a closed session must return nil, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("AutoReconnect did not stop promptly for a closed session")
+	}
+}
+
+func TestAutoReconnectGivesUpAfterMaxAttempts(t *testing.T) {
+	host := config.Host{Name: "x", HostName: "127.0.0.1"}
+	s := NewSession(host, noAuth{}, insecureHostKey())
+	s.dialAddr = "127.0.0.1:1" // nothing listening — every dial fails
+
+	err := s.AutoReconnect(80, 24, 2)
+	if err == nil {
+		t.Fatal("AutoReconnect must return an error after exhausting attempts")
+	}
+	if s.State() != StateFailed {
+		t.Fatalf("state after exhaustion = %v, want StateFailed", s.State())
 	}
 }
