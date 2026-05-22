@@ -145,7 +145,7 @@ func TestSessionCloseIsIdempotent(t *testing.T) {
 // NoClientAuth).
 type noAuth struct{}
 
-func (noAuth) Methods() ([]ssh.AuthMethod, error) { return nil, nil }
+func (noAuth) Methods() ([]ssh.AuthMethod, func(), error) { return nil, func() {}, nil }
 
 // insecureHostKey accepts any host key (test only).
 func insecureHostKey() ssh.HostKeyCallback {

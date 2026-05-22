@@ -99,10 +99,13 @@ func (s *Session) setState(st State, err error) {
 // Connect dials the host and starts an interactive shell with a PTY of the
 // given size.
 func (s *Session) Connect(cols, rows int) error {
-	methods, err := s.auth.Methods()
+	methods, cleanup, err := s.auth.Methods()
 	if err != nil {
 		s.setState(StateFailed, err)
 		return err
+	}
+	if cleanup != nil {
+		defer cleanup()
 	}
 	user := s.host.User
 	if user == "" {

@@ -51,10 +51,14 @@ func startFakeAgent(t *testing.T) string {
 func TestAgentProviderReturnsMethods(t *testing.T) {
 	sock := startFakeAgent(t)
 	p := &AgentProvider{SocketPath: sock}
-	methods, err := p.Methods()
+	methods, cleanup, err := p.Methods()
 	if err != nil {
 		t.Fatalf("Methods: %v", err)
 	}
+	if cleanup == nil {
+		t.Fatal("want a non-nil cleanup func")
+	}
+	defer cleanup()
 	if len(methods) == 0 {
 		t.Fatal("want at least one auth method")
 	}
@@ -62,20 +66,8 @@ func TestAgentProviderReturnsMethods(t *testing.T) {
 
 func TestAgentProviderMissingSocket(t *testing.T) {
 	p := &AgentProvider{SocketPath: filepath.Join(t.TempDir(), "nope.sock")}
-	if _, err := p.Methods(); err == nil {
+	if _, _, err := p.Methods(); err == nil {
 		t.Fatal("want error for missing agent socket")
-	}
-}
-
-func TestAgentProviderSigners(t *testing.T) {
-	sock := startFakeAgent(t)
-	p := &AgentProvider{SocketPath: sock}
-	signers, err := p.signers()
-	if err != nil {
-		t.Fatalf("signers: %v", err)
-	}
-	if len(signers) == 0 {
-		t.Fatal("want at least one signer from the agent")
 	}
 }
 

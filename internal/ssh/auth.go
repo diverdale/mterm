@@ -9,11 +9,14 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-// AuthProvider supplies SSH authentication methods. v1 ships only AgentProvider;
-// key-file, password, and jump-host providers implement this interface later
-// with no caller changes.
+// AuthProvider supplies SSH authentication methods. The returned cleanup func
+// releases any resources (such as an agent connection) and must be called once
+// the SSH handshake using these methods has finished.
+//
+// v1 ships only AgentProvider; key-file, password, and jump-host providers
+// implement this interface later with no caller changes.
 type AuthProvider interface {
-	Methods() ([]ssh.AuthMethod, error)
+	Methods() (methods []ssh.AuthMethod, cleanup func(), err error)
 }
 
 // AgentProvider authenticates using keys held by a running ssh-agent.
@@ -30,25 +33,20 @@ func AgentProviderFromEnv() (*AgentProvider, error) {
 	return &AgentProvider{SocketPath: sock}, nil
 }
 
-// Methods returns a public-key auth method backed by the ssh-agent. It probes
-// the agent socket eagerly so an unreachable agent fails fast; the returned
-// auth method dials a fresh, short-lived connection for each key negotiation,
-// so no socket is held open between handshakes.
-func (p *AgentProvider) Methods() ([]ssh.AuthMethod, error) {
-	probe, err := net.Dial("unix", p.SocketPath)
-	if err != nil {
-		return nil, fmt.Errorf("connect to ssh-agent: %w", err)
-	}
-	probe.Close()
-	return []ssh.AuthMethod{ssh.PublicKeysCallback(p.signers)}, nil
-}
-
-// signers dials the agent, retrieves its signers, and closes the connection.
-func (p *AgentProvider) signers() ([]ssh.Signer, error) {
+// Methods dials the ssh-agent and returns a public-key auth method backed by
+// it. The agent connection must stay open until the returned cleanup func is
+// called: ssh.PublicKeysCallback signs against the agent lazily during the
+// handshake, so closing the connection earlier breaks authentication.
+func (p *AgentProvider) Methods() ([]ssh.AuthMethod, func(), error) {
 	conn, err := net.Dial("unix", p.SocketPath)
 	if err != nil {
-		return nil, fmt.Errorf("connect to ssh-agent: %w", err)
+		return nil, nil, fmt.Errorf("connect to ssh-agent: %w", err)
 	}
-	defer conn.Close()
-	return agent.NewClient(conn).Signers()
+	ag := agent.NewClient(conn)
+	if _, err := ag.List(); err != nil {
+		conn.Close()
+		return nil, nil, fmt.Errorf("query ssh-agent: %w", err)
+	}
+	cleanup := func() { conn.Close() }
+	return []ssh.AuthMethod{ssh.PublicKeysCallback(ag.Signers)}, cleanup, nil
 }
