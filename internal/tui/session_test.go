@@ -33,3 +33,13 @@ func TestSessionTabViewRendersTerminal(t *testing.T) {
 		t.Fatal("View() returned empty")
 	}
 }
+
+func TestSessionTabNilSessionIsSafe(t *testing.T) {
+	tab := newSessionTab(1, config.Host{Name: "h"}, 80, 24)
+	// No session attached — these must all be safe no-ops.
+	tab.sendInput([]byte("hello"))
+	tab.resize(50, 20)
+	tab.close()
+	// close() on a never-attached tab must also be safe.
+	tab.close()
+}

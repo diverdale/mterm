@@ -16,9 +16,9 @@ type sessionTab struct {
 	id    int
 	host  config.Host
 	term  *terminal.Terminal
-	sess  *mssh.Session // nil until connected
-	dirty atomic.Bool   // set by the reader goroutine, cleared on render
-	w, h  int           // full tab area including the tab bar
+	sess  atomic.Pointer[mssh.Session] // nil until connected
+	dirty atomic.Bool                  // set by the reader goroutine, cleared on render
+	w, h  int                          // full tab area including the tab bar
 }
 
 // newSessionTab creates a tab sized to the given total area.
@@ -40,7 +40,7 @@ func (t *sessionTab) title() string { return t.host.Name }
 
 // attach binds a connected ssh.Session and starts the reader goroutine.
 func (t *sessionTab) attach(s *mssh.Session) {
-	t.sess = s
+	t.sess.Store(s)
 	go t.readLoop()
 }
 
@@ -48,9 +48,13 @@ func (t *sessionTab) attach(s *mssh.Session) {
 // recovers from panics so one bad session cannot crash the program.
 func (t *sessionTab) readLoop() {
 	defer func() { _ = recover() }()
+	s := t.sess.Load()
+	if s == nil {
+		return
+	}
 	buf := make([]byte, 32*1024)
 	for {
-		n, err := t.sess.Read(buf)
+		n, err := s.Read(buf)
 		if n > 0 {
 			t.term.Write(buf[:n])
 			t.dirty.Store(true)
@@ -70,15 +74,15 @@ func (t *sessionTab) resize(w, h int) {
 		bodyH = 1
 	}
 	t.term.Resize(w, bodyH)
-	if t.sess != nil {
-		_ = t.sess.Resize(w, bodyH)
+	if s := t.sess.Load(); s != nil {
+		_ = s.Resize(w, bodyH)
 	}
 }
 
 // sendInput writes encoded key bytes to the remote shell.
 func (t *sessionTab) sendInput(p []byte) {
-	if t.sess != nil && len(p) > 0 {
-		_, _ = t.sess.Write(p)
+	if s := t.sess.Load(); s != nil && len(p) > 0 {
+		_, _ = s.Write(p)
 	}
 }
 
@@ -89,7 +93,8 @@ func (t *sessionTab) View() string {
 
 // close terminates the session.
 func (t *sessionTab) close() {
-	if t.sess != nil {
-		_ = t.sess.Close()
+	if s := t.sess.Load(); s != nil {
+		_ = s.Close()
 	}
+	t.sess.Store(nil)
 }
