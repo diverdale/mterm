@@ -33,17 +33,18 @@ func (v *HostKeyVerifier) Callback() ssh.HostKeyCallback {
 		if err != nil {
 			return err
 		}
-		if err := base(hostname, remote, key); err == nil {
-			return nil
-		} else if _, isMismatch := err.(*knownhosts.KeyError); !isMismatch {
-			return err
-		} else {
-			// KeyError with an empty Want slice means "unknown host"; a
-			// populated Want slice means a genuine mismatch.
-			ke := err.(*knownhosts.KeyError)
-			if len(ke.Want) > 0 {
-				return fmt.Errorf("host key mismatch for %s: possible MITM", hostname)
-			}
+		err = base(hostname, remote, key)
+		if err == nil {
+			return nil // key already known and matches
+		}
+		ke, ok := err.(*knownhosts.KeyError)
+		if !ok {
+			return err // some other error (e.g. revoked key) — pass through
+		}
+		// KeyError with an empty Want slice means "unknown host"; a
+		// populated Want slice means a genuine mismatch.
+		if len(ke.Want) > 0 {
+			return fmt.Errorf("host key mismatch for %s: possible MITM", hostname)
 		}
 		// Unknown host: ask the user.
 		if !v.decide(hostname, key) {

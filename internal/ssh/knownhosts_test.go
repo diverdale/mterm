@@ -57,6 +57,36 @@ func TestKnownHostsRejectedKeyFails(t *testing.T) {
 	}
 }
 
+func TestKnownHostsMismatchFails(t *testing.T) {
+	path := t.TempDir() + "/known_hosts"
+	key1 := testHostKey(t)
+	key2 := testHostKey(t) // a different key for the same host
+
+	// Accept key1 for host:22.
+	v1 := NewHostKeyVerifier(path, func(string, ssh.PublicKey) bool { return true })
+	addr := &net.TCPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 22}
+	if err := v1.Callback()("host:22", addr, key1); err != nil {
+		t.Fatal(err)
+	}
+
+	// Present key2 for the same host — must hard-fail (MITM), not prompt.
+	var asked bool
+	v2 := NewHostKeyVerifier(path, func(string, ssh.PublicKey) bool {
+		asked = true
+		return true
+	})
+	err := v2.Callback()("host:22", addr, key2)
+	if err == nil {
+		t.Fatal("key mismatch must return an error")
+	}
+	if asked {
+		t.Fatal("key mismatch must not invoke the decision callback")
+	}
+	if !strings.Contains(err.Error(), "mismatch") {
+		t.Fatalf("error should mention mismatch, got: %v", err)
+	}
+}
+
 func TestKnownHostsKnownKeyDoesNotAsk(t *testing.T) {
 	path := t.TempDir() + "/known_hosts"
 	key := testHostKey(t)
