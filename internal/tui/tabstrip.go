@@ -26,14 +26,19 @@ func statusGlyph(s tabStatus, spinnerCounter int) string {
 func renderTabStrip(tabs []*sessionTab, activeIdx, spinnerCounter, width int) string {
 	chips := make([]string, 0, len(tabs))
 	for i, t := range tabs {
-		label := fmt.Sprintf("%s %d %s", statusGlyph(t.status(), spinnerCounter), i+1, t.title())
+		// The status glyph carries its own color. Render it as its own span
+		// between separately-styled text spans — never nest pre-styled content
+		// inside another style, since the glyph's embedded reset would break
+		// the outer style for everything after it.
+		glyph := statusGlyph(t.status(), spinnerCounter)
+		text := fmt.Sprintf(" %d %s", i+1, t.title())
 		if i == activeIdx {
 			// The active tab is outlined with brackets; inactive tabs use
 			// matching blank padding so a tab's label does not shift when it
 			// gains or loses focus.
-			chips = append(chips, sty.tabActive.Render("[ "+label+" ]"))
+			chips = append(chips, sty.tabActive.Render("[ ")+glyph+sty.tabActive.Render(text+" ]"))
 		} else {
-			chips = append(chips, sty.tabInactive.Render("  "+label+"  "))
+			chips = append(chips, sty.tabInactive.Render("  ")+glyph+sty.tabInactive.Render(text+"  "))
 		}
 	}
 	strip := lipgloss.JoinHorizontal(lipgloss.Top, chips...)
