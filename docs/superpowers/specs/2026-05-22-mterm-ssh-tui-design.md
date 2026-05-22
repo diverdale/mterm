@@ -234,9 +234,9 @@ for every session and resizes every tab's VT emulator.
 
 ### Prefix key
 
-A configurable prefix key (default `Ctrl-A`), tmux-style, separates mterm
-commands from the remote shell. Everything that is not the prefix sequence is
-sent to the focused session.
+A fixed prefix key, `Ctrl-B`, tmux-style, separates mterm commands from the
+remote shell. Everything that is not the prefix sequence is sent to the focused
+session. The prefix is hardcoded in v1; making it configurable is future work.
 
 | Key | Action |
 |-----|--------|
@@ -289,3 +289,5 @@ clipboard, `Esc` exits.
 - Additional `AuthProvider` implementations: key files (with passphrase prompt),
   password, jump hosts / bastion (`ProxyJump`).
 - Split-pane / tiled layout.
+- Configurable prefix key (and richer key bindings on Kitty-protocol terminals).
+- Interactive ad-hoc port forwards.
