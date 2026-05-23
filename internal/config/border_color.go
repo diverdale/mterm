@@ -1,6 +1,8 @@
 package config
 
-import "fmt"
+import "errors"
+
+var errBadBorderColor = errors.New("want #RRGGBB or #RGB")
 
 // parseBorderColor validates a host borderColor value. Empty input is allowed
 // and returns ("", nil) — the host has no override. A non-empty value must be
@@ -11,14 +13,14 @@ func parseBorderColor(s string) (string, error) {
 		return "", nil
 	}
 	if len(s) != 7 && len(s) != 4 {
-		return "", fmt.Errorf("want #RRGGBB or #RGB")
+		return "", errBadBorderColor
 	}
 	if s[0] != '#' {
-		return "", fmt.Errorf("want #RRGGBB or #RGB")
+		return "", errBadBorderColor
 	}
 	for _, c := range s[1:] {
 		if !isHexDigit(c) {
-			return "", fmt.Errorf("want #RRGGBB or #RGB")
+			return "", errBadBorderColor
 		}
 	}
 	return s, nil
