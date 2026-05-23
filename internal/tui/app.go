@@ -113,11 +113,19 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 		return nil
 
 	case paletteChosenMsg:
+		// Run the action, then restore prevMode ONLY if the action did not
+		// itself change the mode. Several palette commands (Open picker,
+		// Open forwards panel, Switch tab, Connect host) intentionally
+		// transition to a new mode; unconditionally restoring prevMode
+		// would silently undo those.
+		before := a.mode
 		var cmd tea.Cmd
 		if m.cmd.action != nil {
 			cmd = m.cmd.action(a)
 		}
-		a.mode = a.prevMode
+		if a.mode == before {
+			a.mode = a.prevMode
+		}
 		return cmd
 
 	case paletteClosedMsg:

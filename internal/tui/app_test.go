@@ -429,6 +429,24 @@ func TestAppPaletteChosenRunsActionAndRestoresPrevMode(t *testing.T) {
 	}
 }
 
+func TestAppPaletteChosenPreservesActionModeChange(t *testing.T) {
+	// Commands like "Open picker" intentionally change a.mode in their
+	// action. The palette handler must NOT overwrite that with prevMode.
+	app := newTestApp()
+	app.mode = modePalette
+	app.prevMode = modeSession
+
+	c := command{label: "to picker", group: "G", action: func(a *App) tea.Cmd {
+		a.mode = modePicker
+		return nil
+	}}
+	app.update(paletteChosenMsg{cmd: c})
+
+	if app.mode != modePicker {
+		t.Fatalf("action set modePicker but handler reset to %v", app.mode)
+	}
+}
+
 func TestReloadHostsKeepsPickerNonNil(t *testing.T) {
 	app := newTestApp()
 	reloadHosts(app)

@@ -10,7 +10,7 @@ import (
 func TestHelpViewListsAllPrefixKeys(t *testing.T) {
 	h := newHelpModel()
 	v := h.View()
-	for _, want := range []string{"^B c", "^B n", "^B p", "^B x", "^B f", "^B ?", "^B q", "1..9"} {
+	for _, want := range []string{"^B c", "^B n", "^B p", "^B x", "^B f", "^B :", "^B ?", "^B q", "1..9"} {
 		if !strings.Contains(v, want) {
 			t.Fatalf("help missing %q in view:\n%s", want, v)
 		}
