@@ -3,7 +3,13 @@
 **Status:** approved 2026-05-23
 **Roadmap item:** Tier 2 — per-host visual identity (item #1 in suggested sequence)
 
-> **Post-merge note (2026-05-23):** the yaml field is `bordercolor` (lowercase), not `borderColor`. All mterm yaml tags switched to lowercase + strict KnownFields decoding shortly after merge; see `fix(config): lowercase yaml tags + strict unknown-key warnings`.
+> **Post-merge note (2026-05-23):** the yaml field is `bordercolor` (lowercase), not `borderColor`. All mterm yaml tags switched to lowercase + strict KnownFields decoding shortly after merge. A follow-up also renamed the dial-address field from `hostname` to `address` and added `hostname`/`host` as aliases for `name`. The hosts.yaml entry now reads:
+> ```yaml
+> - name: prod
+>   address: 10.0.0.5
+>   user: dale
+>   bordercolor: "#FF3344"
+> ```
 
 ## Goal
 

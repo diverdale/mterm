@@ -20,7 +20,7 @@ hosts:
     group: production
     tags: [web, critical]
   - name: lab-box
-    hostname: 10.9.0.12
+    address: 10.9.0.12
     user: dale
     port: 22
     group: lab
@@ -93,7 +93,7 @@ hosts:
   - name: ""
     group: orphan
   - name: valid-host
-    hostname: 1.2.3.4
+    address: 1.2.3.4
 `)
 
 	res, err := loadAndMerge(sshPath, mtermPath)
@@ -161,9 +161,9 @@ func TestMergeSortedByGroupThenName(t *testing.T) {
 	sshPath := writeTemp(t, "config", "")
 	mtermPath := writeTemp(t, "hosts.yaml", `
 hosts:
-  - {name: zeta, hostname: z, group: alpha}
-  - {name: alpha, hostname: a, group: beta}
-  - {name: beta, hostname: b, group: alpha}
+  - {name: zeta, address: z, group: alpha}
+  - {name: alpha, address: a, group: beta}
+  - {name: beta, address: b, group: alpha}
 `)
 	res, err := loadAndMerge(sshPath, mtermPath)
 	if err != nil {
@@ -272,5 +272,91 @@ func TestLoadAndMergeUnknownYAMLKeyWarns(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("warnings = %v, want one mentioning hostName", res.Warnings)
+	}
+}
+
+func TestLoadAndMergeNameAliases(t *testing.T) {
+	// `name`, `hostname`, and `host` are interchangeable spellings for the
+	// friendly label. `address` is the dial target. Verify each spelling
+	// produces the same canonical Host.
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: via-name
+    address: 10.0.0.1
+  - hostname: via-hostname
+    address: 10.0.0.2
+  - host: via-host
+    address: 10.0.0.3
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", res.Warnings)
+	}
+	want := map[string]string{
+		"via-name":     "10.0.0.1",
+		"via-hostname": "10.0.0.2",
+		"via-host":     "10.0.0.3",
+	}
+	got := map[string]string{}
+	for _, h := range res.Hosts {
+		got[h.Name] = h.HostName
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestLoadAndMergeAddressFallsBackToName(t *testing.T) {
+	// No `address` set → dial target falls back to Name (DNS resolves it).
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: just-a-name
+    user: dale
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hosts) != 1 || res.Hosts[0].HostName != "just-a-name" {
+		t.Fatalf("HostName should fall back to Name; got %+v", res.Hosts)
+	}
+}
+
+func TestLoadAndMergeNameAliasConflictWarns(t *testing.T) {
+	// `name: foo` and `hostname: bar` together: name wins, but a warning
+	// surfaces so the user knows the hostname field was dropped.
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: winner
+    hostname: loser
+    address: 10.0.0.1
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hosts) != 1 || res.Hosts[0].Name != "winner" {
+		t.Fatalf("Name should be 'winner'; got %+v", res.Hosts)
+	}
+	found := false
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "winner") && strings.Contains(w, "hostname=loser") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("warnings = %v, want one naming the conflict", res.Warnings)
 	}
 }

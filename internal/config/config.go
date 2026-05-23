@@ -47,16 +47,20 @@ func loadAndMerge(sshPath, mtermPath string) (*Result, error) {
 	}
 
 	if mf != nil {
-		for _, mh := range mf.Hosts {
+		for i := range mf.Hosts {
+			mh := &mf.Hosts[i]
+			if warn := mh.canonicalNameAlias(); warn != "" {
+				res.Warnings = append(res.Warnings, "mterm config: "+warn)
+			}
 			if mh.Name == "" {
 				res.Warnings = append(res.Warnings, "mterm config: host with empty name skipped")
 				continue
 			}
 			if existing, ok := byName[mh.Name]; ok {
-				applyOverlay(existing, mh)
+				applyOverlay(existing, *mh)
 				continue
 			}
-			h := hostFromMterm(mh)
+			h := hostFromMterm(*mh)
 			byName[h.Name] = &h
 			order = append(order, h.Name)
 		}
@@ -95,8 +99,8 @@ func applyOverlay(h *Host, mh mtermHost) {
 	if len(mh.Tags) > 0 {
 		h.Tags = mh.Tags
 	}
-	if mh.HostName != "" {
-		h.HostName = mh.HostName
+	if mh.Address != "" {
+		h.HostName = mh.Address
 	}
 	if mh.User != "" {
 		h.User = mh.User
@@ -117,7 +121,7 @@ func hostFromMterm(mh mtermHost) Host {
 	if port == 0 {
 		port = 22
 	}
-	hostName := mh.HostName
+	hostName := mh.Address
 	if hostName == "" {
 		hostName = mh.Name
 	}
