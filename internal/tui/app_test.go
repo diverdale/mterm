@@ -8,7 +8,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 
 	"mterm/internal/config"
 	mssh "mterm/internal/ssh"
@@ -472,9 +471,6 @@ func TestReloadHostsKeepsPickerNonNil(t *testing.T) {
 }
 
 func TestAppSessionViewUsesHostBorderColor(t *testing.T) {
-	lipgloss.SetColorProfile(termenv.TrueColor)
-	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.TrueColor) })
-
 	app := newTestApp()
 	app.width, app.height = 80, 24
 	app.mode = modeSession
@@ -492,9 +488,6 @@ func TestAppSessionViewUsesHostBorderColor(t *testing.T) {
 }
 
 func TestAppSessionViewIgnoresEmptyBorderColor(t *testing.T) {
-	lipgloss.SetColorProfile(termenv.TrueColor)
-	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.TrueColor) })
-
 	app := newTestApp()
 	app.width, app.height = 80, 24
 	app.mode = modeSession
