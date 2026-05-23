@@ -11,13 +11,14 @@ type mtermFile struct {
 }
 
 type mtermHost struct {
-	Name     string         `yaml:"name"`
-	HostName string         `yaml:"hostName"`
-	User     string         `yaml:"user"`
-	Port     int            `yaml:"port"`
-	Group    string         `yaml:"group"`
-	Tags     []string       `yaml:"tags"`
-	Forwards []mtermForward `yaml:"forwards"`
+	Name        string         `yaml:"name"`
+	HostName    string         `yaml:"hostName"`
+	User        string         `yaml:"user"`
+	Port        int            `yaml:"port"`
+	Group       string         `yaml:"group"`
+	Tags        []string       `yaml:"tags"`
+	Forwards    []mtermForward `yaml:"forwards"`
+	BorderColor string         `yaml:"borderColor"`
 }
 
 type mtermForward struct {

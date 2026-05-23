@@ -63,7 +63,18 @@ func loadAndMerge(sshPath, mtermPath string) (*Result, error) {
 	}
 
 	for _, name := range order {
-		res.Hosts = append(res.Hosts, *byName[name])
+		h := *byName[name]
+		if h.BorderColor != "" {
+			parsed, err := parseBorderColor(h.BorderColor)
+			if err != nil {
+				res.Warnings = append(res.Warnings,
+					fmt.Sprintf("mterm config: host %q borderColor %q: %v", h.Name, h.BorderColor, err))
+				h.BorderColor = ""
+			} else {
+				h.BorderColor = parsed
+			}
+		}
+		res.Hosts = append(res.Hosts, h)
 	}
 	sort.SliceStable(res.Hosts, func(i, j int) bool {
 		a, b := res.Hosts[i], res.Hosts[j]
@@ -96,6 +107,9 @@ func applyOverlay(h *Host, mh mtermHost) {
 	for _, mf := range mh.Forwards {
 		h.Forwards = append(h.Forwards, mf.toForward())
 	}
+	if mh.BorderColor != "" {
+		h.BorderColor = mh.BorderColor
+	}
 }
 
 func hostFromMterm(mh mtermHost) Host {
@@ -112,13 +126,14 @@ func hostFromMterm(mh mtermHost) Host {
 		forwards = append(forwards, mf.toForward())
 	}
 	return Host{
-		Name:     mh.Name,
-		HostName: hostName,
-		User:     mh.User,
-		Port:     port,
-		Group:    mh.Group,
-		Tags:     mh.Tags,
-		Source:   SourceMterm,
-		Forwards: forwards,
+		Name:        mh.Name,
+		HostName:    hostName,
+		User:        mh.User,
+		Port:        port,
+		Group:       mh.Group,
+		Tags:        mh.Tags,
+		Source:      SourceMterm,
+		Forwards:    forwards,
+		BorderColor: mh.BorderColor,
 	}
 }

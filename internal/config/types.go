@@ -51,6 +51,7 @@ type Host struct {
 	IdentityFile string // parsed now, used when key-file auth lands
 	ProxyJump    string // parsed now, used when jump-host support lands
 	Forwards     []Forward
+	BorderColor  string // hex like "#RRGGBB" or "#RGB"; "" = no override
 }
 
 // Addr returns the host:port dial string.

@@ -1,6 +1,12 @@
 package config
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+)
 
 func TestMergeOverlayAndNewHost(t *testing.T) {
 	sshPath := writeTemp(t, "config", `
@@ -172,5 +178,67 @@ hosts:
 		if order[i] != want[i] {
 			t.Fatalf("sort order = %v, want %v", order, want)
 		}
+	}
+}
+
+func TestLoadAndMergeBorderColorValid(t *testing.T) {
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: prod
+    borderColor: "#FF3344"
+  - name: dev
+    borderColor: "#F33"
+  - name: plain
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, h := range res.Hosts {
+		got[h.Name] = h.BorderColor
+	}
+	want := map[string]string{"prod": "#FF3344", "dev": "#F33", "plain": ""}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("BorderColor map = %v, want %v", got, want)
+	}
+	if len(res.Warnings) != 0 {
+		t.Fatalf("warnings = %v, want none", res.Warnings)
+	}
+}
+
+func TestLoadAndMergeBorderColorInvalidWarns(t *testing.T) {
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: badhost
+    borderColor: "red"
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hosts) != 1 || res.Hosts[0].Name != "badhost" {
+		t.Fatalf("hosts = %+v, want one badhost", res.Hosts)
+	}
+	if res.Hosts[0].BorderColor != "" {
+		t.Fatalf("BorderColor = %q, want \"\" on invalid", res.Hosts[0].BorderColor)
+	}
+	if len(res.Warnings) == 0 {
+		t.Fatal("want a warning for invalid borderColor, got none")
+	}
+	found := false
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "badhost") && strings.Contains(w, "borderColor") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("warnings = %v, want one naming host+borderColor", res.Warnings)
 	}
 }
