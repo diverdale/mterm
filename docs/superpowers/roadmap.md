@@ -22,6 +22,9 @@ XL ≈ structural change to the app, multiple branches.
 - Per-session output logging to `~/.config/mterm/logs/<host>/<timestamp>.log`
   (default-on; per-host `log: false` opt-out; "Show log path for current tab"
   palette command)
+- Broadcast input — `^B s` toggles the active tab into a sync set; every
+  keystroke in any sync-set tab fans out to the rest. Warning-color asterisk
+  in the tab chip + `[sync N]` count in the window title.
 - Command palette (`^B :`) and help overlay (`^B ?`)
 - Port-forwarding plumbing (panel exists; integration deferred)
 - Per-tab session timer, animated status spinner

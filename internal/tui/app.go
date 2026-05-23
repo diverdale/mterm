@@ -57,6 +57,12 @@ type App struct {
 	active   int
 	nextID   int
 
+	// syncTabs holds the IDs of tabs in the broadcast (sync) set. Keyed by
+	// tab.id (stable across close/reorder, unlike index). When the active
+	// tab is in this set, every plain keystroke fans out to every other
+	// tab in the set as well.
+	syncTabs map[int]bool
+
 	width, height int
 	statusMsg     string
 	tickCount     int    // render-tick counter, drives status spinners
@@ -66,12 +72,33 @@ type App struct {
 // NewApp builds the root model.
 func NewApp(hosts []config.Host, connect Connector) *App {
 	return &App{
-		connect: connect,
-		mode:    modePicker,
-		picker:  newPicker(hosts),
-		nextID:  1,
+		connect:  connect,
+		mode:     modePicker,
+		picker:   newPicker(hosts),
+		nextID:   1,
+		syncTabs: map[int]bool{},
 	}
 }
+
+// toggleActiveTabSync flips the active tab's membership in the broadcast
+// set. No-op when there is no active tab.
+func (a *App) toggleActiveTabSync() {
+	t := a.activeTab()
+	if t == nil {
+		return
+	}
+	if a.syncTabs[t.id] {
+		delete(a.syncTabs, t.id)
+	} else {
+		a.syncTabs[t.id] = true
+	}
+}
+
+// tabInSync reports whether the given tab ID is in the broadcast set.
+func (a *App) tabInSync(id int) bool { return a.syncTabs[id] }
+
+// clearSyncSet empties the broadcast set.
+func (a *App) clearSyncSet() { a.syncTabs = map[int]bool{} }
 
 // SetLogRoot sets the per-session log directory. Empty disables logging for
 // every tab regardless of host opt-in. Call before Run.
@@ -178,8 +205,21 @@ func (a *App) handleKey(k tea.KeyMsg) tea.Cmd {
 	case modeForwards:
 		return a.forwards.Update(k)
 	case modeSession:
-		if t := a.activeTab(); t != nil {
-			t.sendInput(keyToBytes(k))
+		t := a.activeTab()
+		if t == nil {
+			return nil
+		}
+		bytes := keyToBytes(k)
+		t.sendInput(bytes)
+		// If the active tab is in the broadcast set, fan the same bytes
+		// out to every other tab in the set. Prefix keys never reach
+		// this branch (handled above), so broadcast is keystroke-only.
+		if a.syncTabs[t.id] {
+			for _, other := range a.tabs {
+				if other.id != t.id && a.syncTabs[other.id] {
+					other.sendInput(bytes)
+				}
+			}
 		}
 		return nil
 	}
@@ -211,6 +251,8 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 			a.forwards = newForwardsPanel(t.host)
 			a.mode = modeForwards
 		}
+	case "s":
+		a.toggleActiveTabSync()
 	case "q":
 		return a.shutdown()
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
@@ -269,6 +311,7 @@ func (a *App) removeTabAt(idx int) {
 	if idx < 0 || idx >= len(a.tabs) {
 		return
 	}
+	delete(a.syncTabs, a.tabs[idx].id)
 	a.tabs[idx].close()
 	a.tabs = append(a.tabs[:idx], a.tabs[idx+1:]...)
 	if a.active >= len(a.tabs) {
@@ -406,8 +449,8 @@ func (a *App) sessionView() string {
 		return a.pickerView()
 	}
 	s := chromeStylesFor(t.host.BorderColor)
-	title := s.title.Render(appmeta.Name) + statusCount(len(a.tabs))
-	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2, s)
+	title := s.title.Render(appmeta.Name) + statusCount(len(a.tabs)) + syncCount(len(a.syncTabs))
+	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2, s, a.syncTabs)
 	footer := renderFooter(footerOpts{
 		hints:         []keyHint{{"^B", "menu"}, {"^B n", "next"}, {"^B x", "close"}},
 		info:          sessionInfo(t.host),
@@ -437,6 +480,16 @@ func statusCount(n int) string {
 		noun = "tab"
 	}
 	return sty.titleDim.Render(fmt.Sprintf("  [%d %s]", n, noun))
+}
+
+// syncCount renders a warning-color " [sync N]" suffix when the broadcast set
+// is non-empty. Empty returns "" so non-sync windows look unchanged.
+func syncCount(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return lipgloss.NewStyle().Foreground(active.Warning).Bold(true).
+		Render(fmt.Sprintf("  [sync %d]", n))
 }
 
 // sessionInfo renders user@host:port for the footer.

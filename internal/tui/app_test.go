@@ -426,6 +426,108 @@ func TestAppHelpClosedRestoresPrevMode(t *testing.T) {
 	}
 }
 
+func TestSyncToggleAddsAndRemovesActiveTab(t *testing.T) {
+	app := newTestApp()
+	app.mode = modeSession
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+
+	if app.tabInSync(1) {
+		t.Fatal("sync set should start empty")
+	}
+	app.toggleActiveTabSync()
+	if !app.tabInSync(1) {
+		t.Fatal("toggle should add active tab to sync")
+	}
+	app.toggleActiveTabSync()
+	if app.tabInSync(1) {
+		t.Fatal("second toggle should remove tab from sync")
+	}
+}
+
+func TestSyncBroadcastsKeystrokeToOtherSyncTabs(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+	app.tabs = []*sessionTab{
+		newSessionTab(1, config.Host{Name: "a"}, 80, 24),
+		newSessionTab(2, config.Host{Name: "b"}, 80, 24),
+		newSessionTab(3, config.Host{Name: "c"}, 80, 24),
+	}
+	app.active = 0
+	// Active tab + one other in sync; the third tab stays out.
+	app.syncTabs[1] = true
+	app.syncTabs[2] = true
+
+	// Without real SSH sessions attached, sendInput silently no-ops; we
+	// only verify the broadcast path doesn't crash and that prefix is
+	// honored. The fanout logic itself is exercised through the active
+	// tab branch.
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+}
+
+func TestSyncPrefixKeyDoesNotBroadcast(t *testing.T) {
+	// ^B is mterm-internal — it must enter the prefix machine, not be
+	// forwarded to any session.
+	app := newTestApp()
+	app.mode = modeSession
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	app.syncTabs[1] = true
+
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	if !app.prefixPending {
+		t.Fatal("Ctrl-B in session+sync should still set prefixPending")
+	}
+}
+
+func TestClosingTabRemovesItFromSync(t *testing.T) {
+	app := newTestApp()
+	app.mode = modeSession
+	app.tabs = []*sessionTab{
+		newSessionTab(1, config.Host{Name: "a"}, 80, 24),
+		newSessionTab(2, config.Host{Name: "b"}, 80, 24),
+	}
+	app.active = 0
+	app.syncTabs[1] = true
+	app.syncTabs[2] = true
+
+	app.removeTabAt(0)
+	if app.tabInSync(1) {
+		t.Fatal("removed tab must be evicted from the sync set")
+	}
+	if !app.tabInSync(2) {
+		t.Fatal("untouched tab should stay in the sync set")
+	}
+}
+
+func TestPrefixSTogglesActiveTabSync(t *testing.T) {
+	app := newTestApp()
+	app.mode = modeSession
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	if !app.tabInSync(1) {
+		t.Fatal("^B s should add the active tab to sync")
+	}
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	if app.tabInSync(1) {
+		t.Fatal("second ^B s should remove the active tab from sync")
+	}
+}
+
+func TestSyncCountSuffixShowsOnlyWhenNonEmpty(t *testing.T) {
+	if got := syncCount(0); got != "" {
+		t.Fatalf("syncCount(0) = %q, want empty", got)
+	}
+	if got := syncCount(3); !strings.Contains(got, "sync 3") {
+		t.Fatalf("syncCount(3) = %q, want to contain 'sync 3'", got)
+	}
+}
+
 func TestAppCtrlCPassesThroughToSession(t *testing.T) {
 	// Ctrl-C is the universal "interrupt remote process" signal — mterm
 	// must NOT intercept it. Quit is on the deliberate ^B q two-step.

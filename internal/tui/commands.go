@@ -106,6 +106,28 @@ func buildCommands(a *App) []command {
 		action: func(a *App) tea.Cmd { showLogPath(a); return nil },
 	})
 
+	// Broadcast / sync
+	cmds = append(cmds,
+		command{label: "Add active tab to sync set", group: "Broadcast", action: func(a *App) tea.Cmd {
+			t := a.activeTab()
+			if t != nil && !a.tabInSync(t.id) {
+				a.toggleActiveTabSync()
+			}
+			return nil
+		}},
+		command{label: "Remove active tab from sync set", group: "Broadcast", action: func(a *App) tea.Cmd {
+			t := a.activeTab()
+			if t != nil && a.tabInSync(t.id) {
+				a.toggleActiveTabSync()
+			}
+			return nil
+		}},
+		command{label: "Clear sync set", group: "Broadcast", action: func(a *App) tea.Cmd {
+			a.clearSyncSet()
+			return nil
+		}},
+	)
+
 	return cmds
 }
 
