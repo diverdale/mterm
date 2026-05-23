@@ -55,6 +55,23 @@ var active = Midnight
 // sty is the chrome style set, built once from the active theme.
 var sty = buildStyles(active)
 
+// chromeStylesFor returns a styleSet identical to the active set, except that
+// the four host-tinted styles use c instead of the theme's Frame/Accent.
+// When c is "", returns the global sty unchanged so callers can use this
+// unconditionally.
+func chromeStylesFor(c string) styleSet {
+	if c == "" {
+		return sty
+	}
+	col := lipgloss.Color(c)
+	s := sty
+	s.border = lipgloss.NewStyle().Foreground(col)
+	s.title = lipgloss.NewStyle().Foreground(col).Bold(true)
+	s.tabActive = lipgloss.NewStyle().Foreground(col).Bold(true)
+	s.footerInfo = lipgloss.NewStyle().Foreground(col)
+	return s
+}
+
 // buildStyles derives the full style set from a theme. A future theme switcher
 // re-runs this with a different theme.
 func buildStyles(t Theme) styleSet {
