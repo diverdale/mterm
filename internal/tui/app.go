@@ -18,6 +18,8 @@ const (
 	modePicker viewMode = iota
 	modeSession
 	modeForwards
+	modePalette
+	modeHelp
 )
 
 // renderInterval is the coalesced redraw cadence (~30 fps).
@@ -46,6 +48,9 @@ type App struct {
 
 	picker   *picker
 	forwards *forwardsPanel
+	palette  *paletteModel
+	help     *helpModel
+	prevMode viewMode
 	tabs     []*sessionTab
 	active   int
 	nextID   int
@@ -107,6 +112,22 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 		a.mode = modeSession
 		return nil
 
+	case paletteChosenMsg:
+		var cmd tea.Cmd
+		if m.cmd.action != nil {
+			cmd = m.cmd.action(a)
+		}
+		a.mode = a.prevMode
+		return cmd
+
+	case paletteClosedMsg:
+		a.mode = a.prevMode
+		return nil
+
+	case helpClosedMsg:
+		a.mode = a.prevMode
+		return nil
+
 	case connectedMsg:
 		a.handleConnected(m)
 		return nil
@@ -126,6 +147,12 @@ func (a *App) handleKey(k tea.KeyMsg) tea.Cmd {
 
 	case modeForwards:
 		return a.forwards.Update(k)
+
+	case modePalette:
+		return a.palette.Update(k)
+
+	case modeHelp:
+		return a.help.Update(k)
 
 	case modeSession:
 		if a.prefixPending {
@@ -153,7 +180,13 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 	case "n":
 		a.cycleTab(1)
 	case "p":
-		a.cycleTab(-1)
+		a.prevMode = a.mode
+		a.palette = newPaletteModel(buildCommands(a))
+		a.mode = modePalette
+	case "?":
+		a.prevMode = a.mode
+		a.help = newHelpModel()
+		a.mode = modeHelp
 	case "x":
 		a.closeActiveTab()
 	case "f":
@@ -292,6 +325,14 @@ func (a *App) View() string {
 		return a.forwardsView()
 	case modeSession:
 		return a.sessionView()
+	case modePalette:
+		return lipgloss.Place(a.width, a.height,
+			lipgloss.Center, lipgloss.Center,
+			a.palette.View())
+	case modeHelp:
+		return lipgloss.Place(a.width, a.height,
+			lipgloss.Center, lipgloss.Center,
+			a.help.View())
 	default:
 		return a.pickerView()
 	}

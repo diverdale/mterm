@@ -336,3 +336,85 @@ func TestAppSessionViewIsFramed(t *testing.T) {
 		}
 	}
 }
+
+func TestAppPrefixPOpensPalette(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+
+	if app.mode != modePalette {
+		t.Fatalf("mode = %v, want modePalette", app.mode)
+	}
+	if app.palette == nil {
+		t.Fatal("palette is nil")
+	}
+	if app.prevMode != modeSession {
+		t.Fatalf("prevMode = %v, want modeSession", app.prevMode)
+	}
+}
+
+func TestAppPrefixQuestionOpensHelp(t *testing.T) {
+	app := newTestApp()
+	app.mode = modeSession
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
+	if app.mode != modeHelp {
+		t.Fatalf("mode = %v, want modeHelp", app.mode)
+	}
+	if app.help == nil {
+		t.Fatal("help is nil")
+	}
+}
+
+func TestAppPaletteClosedRestoresPrevMode(t *testing.T) {
+	app := newTestApp()
+	app.mode = modePalette
+	app.prevMode = modeSession
+	app.update(paletteClosedMsg{})
+	if app.mode != modeSession {
+		t.Fatalf("after paletteClosedMsg, mode = %v, want modeSession", app.mode)
+	}
+}
+
+func TestAppHelpClosedRestoresPrevMode(t *testing.T) {
+	app := newTestApp()
+	app.mode = modeHelp
+	app.prevMode = modePicker
+	app.update(helpClosedMsg{})
+	if app.mode != modePicker {
+		t.Fatalf("after helpClosedMsg, mode = %v, want modePicker", app.mode)
+	}
+}
+
+func TestAppPaletteChosenRunsActionAndRestoresPrevMode(t *testing.T) {
+	app := newTestApp()
+	app.mode = modePalette
+	app.prevMode = modeSession
+
+	ran := false
+	c := command{label: "test", group: "G", action: func(a *App) tea.Cmd {
+		ran = true
+		return nil
+	}}
+	app.update(paletteChosenMsg{cmd: c})
+
+	if !ran {
+		t.Fatal("command action did not run")
+	}
+	if app.mode != modeSession {
+		t.Fatalf("after running command, mode = %v, want modeSession", app.mode)
+	}
+}
+
+func TestReloadHostsKeepsPickerNonNil(t *testing.T) {
+	app := newTestApp()
+	reloadHosts(app)
+	if app.picker == nil {
+		t.Fatal("picker became nil after reloadHosts")
+	}
+}
