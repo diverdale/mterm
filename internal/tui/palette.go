@@ -12,8 +12,11 @@ type paletteChosenMsg struct{ cmd command }
 type paletteClosedMsg struct{}
 
 const (
-	paletteWidth      = 60
-	paletteInnerWidth = paletteWidth - 6 // 2 border + 2*2 padding
+	paletteWidth = 60
+	// paletteInnerWidth is the content width inside Padding(1, 2) — lipgloss
+	// Width sets the content+padding width and the border sits OUTSIDE it,
+	// so the available text width is paletteWidth minus the 4 padding columns.
+	paletteInnerWidth = paletteWidth - 4
 )
 
 // paletteModel is the centered fuzzy-search command palette.
