@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -9,6 +10,15 @@ import (
 	mssh "mterm/internal/ssh"
 	"mterm/internal/terminal"
 )
+
+// readChunkSize bounds how many bytes the reader drains per iteration. A
+// smaller value caps how long term.Write can hold the terminal mutex, which
+// keeps bubbletea's View() responsive when a remote TUI floods output
+// (opencode-over-ollama can easily push >1 MB/s of dense ANSI). 32 KiB chunks
+// starved the event loop under that load; 8 KiB plus a runtime.Gosched per
+// iteration keeps the render loop fed at the cost of slightly more lock
+// cycles. See the freeze-investigation in fix/read-loop-yield commit.
+const readChunkSize = 8 * 1024
 
 // chromeCols and chromeRows are the screen space the window frame reserves
 // around a session's terminal body: left+right borders, and (top border, tab
@@ -93,7 +103,7 @@ func (t *sessionTab) readLoop() {
 	if s == nil {
 		return
 	}
-	buf := make([]byte, 32*1024)
+	buf := make([]byte, readChunkSize)
 	for {
 		n, err := s.Read(buf)
 		if n > 0 {
@@ -107,6 +117,12 @@ func (t *sessionTab) readLoop() {
 		if err != nil {
 			return
 		}
+		// Yield so a starving render goroutine can grab term.mu between
+		// chunks. Without this, a flood of dense ANSI (e.g. a remote TUI
+		// doing full-screen redraws) can wedge bubbletea's event loop —
+		// View runs on the same goroutine as Update, so a blocked View
+		// stops the clock and ignores keystrokes.
+		runtime.Gosched()
 	}
 }
 
