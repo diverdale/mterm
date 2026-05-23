@@ -35,7 +35,7 @@ var helpSections = []struct {
 		{"^B 1..9", "jump to tab N"},
 		{"^B x", "close current tab"},
 		{"^B f", "open forwards panel"},
-		{"^B p", "open command palette"},
+		{"^B :", "open command palette"},
 		{"^B ?", "this help"},
 		{"^B q", "quit mterm"},
 	}},

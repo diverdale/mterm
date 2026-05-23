@@ -337,7 +337,7 @@ func TestAppSessionViewIsFramed(t *testing.T) {
 	}
 }
 
-func TestAppPrefixPOpensPalette(t *testing.T) {
+func TestAppPrefixColonOpensPalette(t *testing.T) {
 	app := newTestApp()
 	app.width, app.height = 80, 24
 	app.mode = modeSession
@@ -345,7 +345,7 @@ func TestAppPrefixPOpensPalette(t *testing.T) {
 	app.active = 0
 
 	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
-	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
 
 	if app.mode != modePalette {
 		t.Fatalf("mode = %v, want modePalette", app.mode)
@@ -355,6 +355,24 @@ func TestAppPrefixPOpensPalette(t *testing.T) {
 	}
 	if app.prevMode != modeSession {
 		t.Fatalf("prevMode = %v, want modeSession", app.prevMode)
+	}
+}
+
+func TestAppPrefixPCyclesToPrevTab(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+	app.tabs = []*sessionTab{
+		newSessionTab(1, config.Host{Name: "a"}, 80, 24),
+		newSessionTab(2, config.Host{Name: "b"}, 80, 24),
+	}
+	app.active = 1
+
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+
+	if app.active != 0 {
+		t.Fatalf("after ^B p active = %d, want 0 (previous tab)", app.active)
 	}
 }
 

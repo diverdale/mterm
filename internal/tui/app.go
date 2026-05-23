@@ -180,6 +180,8 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 	case "n":
 		a.cycleTab(1)
 	case "p":
+		a.cycleTab(-1)
+	case ":":
 		a.prevMode = a.mode
 		a.palette = newPaletteModel(buildCommands(a))
 		a.mode = modePalette
