@@ -9,6 +9,7 @@ import (
 
 	"mterm/internal/appmeta"
 	"mterm/internal/config"
+	"mterm/internal/diag"
 	"mterm/internal/sessionlog"
 	mssh "mterm/internal/ssh"
 )
@@ -253,6 +254,16 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 		}
 	case "s":
 		a.toggleActiveTabSync()
+	case "D":
+		// Diagnostic: dump every goroutine's stack to /tmp and surface the
+		// path in the footer. Useful when the snapshot worker for one tab
+		// freezes — `^B D` from another (still-responsive) tab captures
+		// the wedged tab's stack without needing a second terminal.
+		if path, err := diag.DumpGoroutines(appmeta.DirName); err != nil {
+			a.statusMsg = fmt.Sprintf("dump failed: %v", err)
+		} else {
+			a.statusMsg = "dump: " + path
+		}
 	case "q":
 		return a.shutdown()
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":

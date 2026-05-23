@@ -40,6 +40,7 @@ var helpSections = []struct {
 		{"^B s", "toggle tab in broadcast sync set"},
 		{"^B :", "open command palette"},
 		{"^B ?", "this help"},
+		{"^B D", "dump goroutines (diagnostic) → /tmp"},
 		{"^B q", "quit mterm"},
 	}},
 	{"Picker", []kb{

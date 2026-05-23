@@ -5,34 +5,34 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"syscall"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	gossh "golang.org/x/crypto/ssh"
 
 	"mterm/internal/appmeta"
 	"mterm/internal/config"
+	"mterm/internal/diag"
 	mssh "mterm/internal/ssh"
 	"mterm/internal/tui"
 )
 
-// installGoroutineDumpHandler wires SIGUSR1 to write every goroutine's stack
-// trace to /tmp/<appname>-stacks-<pid>-<timestamp>.txt. Lets users capture a
-// running mterm's state during a hang: from another terminal, run
-// `kill -USR1 <pid>` (or `pkill -USR1 mterm`) and inspect the file. The path
-// of the most recent dump is printed to stderr; under bubbletea's alt screen
-// that text only becomes visible after mterm exits.
+// installGoroutineDumpHandler wires SIGUSR1 to diag.DumpGoroutines. Lets
+// users capture a running mterm's state during a hang from another terminal:
+//
+//	pkill -USR1 mterm    # or: kill -USR1 <pid>
+//	ls -t /tmp/mterm-stacks-* | head -1
+//
+// The dump path is printed to stderr; under bubbletea's alt screen that
+// becomes visible only after mterm exits. ^B D triggers the same dump
+// in-app and surfaces the path via the footer statusMsg.
 func installGoroutineDumpHandler() {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGUSR1)
 	go func() {
 		for range ch {
-			buf := make([]byte, 1<<20) // 1 MiB
-			n := runtime.Stack(buf, true)
-			path := fmt.Sprintf("/tmp/%s-stacks-%d-%d.txt", appmeta.DirName, os.Getpid(), time.Now().Unix())
-			if err := os.WriteFile(path, buf[:n], 0o600); err != nil {
+			path, err := diag.DumpGoroutines(appmeta.DirName)
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s: stack dump failed: %v\n", appmeta.Name, err)
 				continue
 			}
