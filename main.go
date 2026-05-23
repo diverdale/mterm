@@ -22,6 +22,11 @@ func main() {
 }
 
 func run() error {
+	// Best-effort: ensure ~/.config/<DirName>/ exists so a fresh user can
+	// drop hosts.yaml in place without having to mkdir manually. Failures
+	// fall through to the existing "no hosts" error path.
+	_ = config.BootstrapConfigDir()
+
 	res, err := config.Load()
 	if err != nil {
 		return err

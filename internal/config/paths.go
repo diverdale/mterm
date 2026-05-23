@@ -34,3 +34,14 @@ func LogsDir() (string, error) {
 	}
 	return filepath.Join(dir, "logs"), nil
 }
+
+// BootstrapConfigDir creates ConfigDir() if it does not yet exist. Idempotent.
+// Called at startup so a fresh install can drop hosts.yaml in place without
+// the user having to mkdir first.
+func BootstrapConfigDir() error {
+	dir, err := ConfigDir()
+	if err != nil {
+		return err
+	}
+	return os.MkdirAll(dir, 0o700)
+}
