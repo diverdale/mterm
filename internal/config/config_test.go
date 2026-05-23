@@ -20,16 +20,16 @@ hosts:
     group: production
     tags: [web, critical]
   - name: lab-box
-    hostName: 10.9.0.12
+    hostname: 10.9.0.12
     user: dale
     port: 22
     group: lab
     tags: [scratch]
     forwards:
       - type: local
-        bindPort: 8080
-        dialAddr: 127.0.0.1
-        dialPort: 80
+        bindport: 8080
+        dialaddr: 127.0.0.1
+        dialport: 80
 `)
 
 	res, err := loadAndMerge(sshPath, mtermPath)
@@ -93,7 +93,7 @@ hosts:
   - name: ""
     group: orphan
   - name: valid-host
-    hostName: 1.2.3.4
+    hostname: 1.2.3.4
 `)
 
 	res, err := loadAndMerge(sshPath, mtermPath)
@@ -161,9 +161,9 @@ func TestMergeSortedByGroupThenName(t *testing.T) {
 	sshPath := writeTemp(t, "config", "")
 	mtermPath := writeTemp(t, "hosts.yaml", `
 hosts:
-  - {name: zeta, hostName: z, group: alpha}
-  - {name: alpha, hostName: a, group: beta}
-  - {name: beta, hostName: b, group: alpha}
+  - {name: zeta, hostname: z, group: alpha}
+  - {name: alpha, hostname: a, group: beta}
+  - {name: beta, hostname: b, group: alpha}
 `)
 	res, err := loadAndMerge(sshPath, mtermPath)
 	if err != nil {
@@ -186,9 +186,9 @@ func TestLoadAndMergeBorderColorValid(t *testing.T) {
 	mtermPath := filepath.Join(dir, "hosts.yaml")
 	if err := os.WriteFile(mtermPath, []byte(`hosts:
   - name: prod
-    borderColor: "#FF3344"
+    bordercolor: "#FF3344"
   - name: dev
-    borderColor: "#F33"
+    bordercolor: "#F33"
   - name: plain
 `), 0o600); err != nil {
 		t.Fatal(err)
@@ -215,7 +215,7 @@ func TestLoadAndMergeBorderColorInvalidWarns(t *testing.T) {
 	mtermPath := filepath.Join(dir, "hosts.yaml")
 	if err := os.WriteFile(mtermPath, []byte(`hosts:
   - name: badhost
-    borderColor: "red"
+    bordercolor: "red"
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -230,15 +230,47 @@ func TestLoadAndMergeBorderColorInvalidWarns(t *testing.T) {
 		t.Fatalf("BorderColor = %q, want \"\" on invalid", res.Hosts[0].BorderColor)
 	}
 	if len(res.Warnings) == 0 {
-		t.Fatal("want a warning for invalid borderColor, got none")
+		t.Fatal("want a warning for invalid bordercolor, got none")
 	}
 	found := false
 	for _, w := range res.Warnings {
-		if strings.Contains(w, "badhost") && strings.Contains(w, "borderColor") {
+		if strings.Contains(w, "badhost") && strings.Contains(w, "bordercolor") {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("warnings = %v, want one naming host+borderColor", res.Warnings)
+		t.Fatalf("warnings = %v, want one naming host+bordercolor", res.Warnings)
+	}
+}
+
+func TestLoadAndMergeUnknownYAMLKeyWarns(t *testing.T) {
+	// A misspelled or wrong-case key (the classic "hostName" vs "hostname")
+	// must now surface as a warning instead of being silently dropped — that
+	// silent drop was the cause of the v1 connect-failure bug where users
+	// wrote camelCase keys and the host ended up with empty fields.
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: typo-host
+    hostName: 10.0.0.5
+    user: dale
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath)
+	if err != nil {
+		t.Fatalf("loadAndMerge: %v", err)
+	}
+	if len(res.Warnings) == 0 {
+		t.Fatal("expected a warning naming the unknown field hostName")
+	}
+	found := false
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "hostName") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("warnings = %v, want one mentioning hostName", res.Warnings)
 	}
 }

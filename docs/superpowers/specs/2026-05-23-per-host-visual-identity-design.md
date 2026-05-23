@@ -3,6 +3,8 @@
 **Status:** approved 2026-05-23
 **Roadmap item:** Tier 2 — per-host visual identity (item #1 in suggested sequence)
 
+> **Post-merge note (2026-05-23):** the yaml field is `bordercolor` (lowercase), not `borderColor`. All mterm yaml tags switched to lowercase + strict KnownFields decoding shortly after merge; see `fix(config): lowercase yaml tags + strict unknown-key warnings`.
+
 ## Goal
 
 Let users assign a frame color to a host so that prod, staging, and dev look

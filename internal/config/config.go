@@ -68,7 +68,7 @@ func loadAndMerge(sshPath, mtermPath string) (*Result, error) {
 			parsed, err := parseBorderColor(h.BorderColor)
 			if err != nil {
 				res.Warnings = append(res.Warnings,
-					fmt.Sprintf("mterm config: host %q borderColor %q: %v", h.Name, h.BorderColor, err))
+					fmt.Sprintf("mterm config: host %q bordercolor %q: %v", h.Name, h.BorderColor, err))
 				h.BorderColor = ""
 			} else {
 				h.BorderColor = parsed
