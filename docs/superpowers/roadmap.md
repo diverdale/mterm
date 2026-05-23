@@ -125,6 +125,13 @@ XL ≈ structural change to the app, multiple branches.
 **Open:** Group ordering; default-collapsed vs default-expanded.
 **Depends on:** nothing. (Finishes the earlier "how do I group items" question.)
 
+### Configurable quit-confirm
+**What:** `confirm_quit: false` in `~/.config/mterm/config.yaml` (or top of `hosts.yaml`) to opt out of the Ctrl-C confirmation modal. Default is to confirm.
+**Why:** Some users hate confirmation prompts; the v1 modal is unconditional.
+**Size:** S
+**Open:** Where to put global app config — sibling `config.yaml` file vs top-level keys in `hosts.yaml`?
+**Depends on:** the modal exists today (Ctrl-C → confirm) — this just adds the off switch.
+
 ### Configurable keymap
 **What:** User-overridable prefix and binding map in `~/.config/mterm/keymap.yaml`. Validation + conflict detection.
 **Why:** Some users will scream at `^B` and the v2 prefix flag we wrote ourselves.

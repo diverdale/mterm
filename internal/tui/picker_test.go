@@ -147,13 +147,44 @@ func TestPickerViewHasSelectionAndGroups(t *testing.T) {
 	p := newPicker(sampleHosts())
 	p.setSize(80, 24)
 	out := p.View()
-	// Group headers from sampleHosts: "production" and "lab".
-	if !strings.Contains(out, "production") || !strings.Contains(out, "lab") {
-		t.Fatalf("picker body missing group headers:\n%s", out)
+	// Group headers are uppercased and led by ▸ glyph.
+	for _, want := range []string{"▸ PRODUCTION", "▸ LAB"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("picker body missing group header %q:\n%s", want, out)
+		}
 	}
-	// The selected host's row must carry styling (ANSI escape codes), since
+	// The selected host's row carries styling (ANSI escape codes), since
 	// the cursor row is a selection bar.
 	if !strings.Contains(out, "\x1b[") {
 		t.Fatalf("picker body has no styling at all:\n%s", out)
+	}
+}
+
+func TestPickerGroupHeaderHasBlankLineBetweenGroups(t *testing.T) {
+	// Two non-empty groups → there should be a blank line between the last
+	// host of group A and the header of group B (visual separation).
+	p := newPicker(sampleHosts())
+	p.setSize(80, 24)
+	out := p.View()
+
+	lines := strings.Split(out, "\n")
+	prodIdx, labIdx := -1, -1
+	for i, ln := range lines {
+		if strings.Contains(ln, "▸ PRODUCTION") {
+			prodIdx = i
+		}
+		if strings.Contains(ln, "▸ LAB") {
+			labIdx = i
+		}
+	}
+	if prodIdx < 0 || labIdx < 0 {
+		t.Fatalf("missing one of the two group headers; lines:\n%s", out)
+	}
+	if labIdx <= prodIdx+2 {
+		t.Fatalf("expected a blank line between groups; LAB at %d, PRODUCTION at %d", labIdx, prodIdx)
+	}
+	// Verify the line immediately preceding the LAB header is blank.
+	if strings.TrimSpace(lines[labIdx-1]) != "" {
+		t.Fatalf("line before LAB header is not blank: %q", lines[labIdx-1])
 	}
 }

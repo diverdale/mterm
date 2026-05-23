@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
 	"mterm/internal/config"
@@ -120,14 +121,19 @@ func (p *picker) View() string {
 	}
 
 	lastGroup := "\x00"
+	firstGroup := true
 	for i, h := range v {
 		if h.Group != lastGroup {
+			if !firstGroup {
+				b.WriteString("\n")
+			}
+			firstGroup = false
 			lastGroup = h.Group
 			group := h.Group
 			if group == "" {
-				group = "(ungrouped)"
+				group = "ungrouped"
 			}
-			b.WriteString(sty.groupHeader.Render("  " + group))
+			b.WriteString(renderGroupHeader(group, p.w))
 			b.WriteString("\n")
 		}
 		row := formatHostRow(h)
@@ -140,6 +146,23 @@ func (p *picker) View() string {
 		b.WriteString("\n")
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// renderGroupHeader formats a picker group separator like:
+//
+//	▸ DEVELOPMENT ─────────────────────────────────
+//
+// with the glyph + label in the accent group-header style and the trailing
+// rule in dim. width is the picker body width; a too-narrow width truncates
+// the rule but still shows the label.
+func renderGroupHeader(label string, width int) string {
+	upper := strings.ToUpper(label)
+	prefix := "▸ " + upper + " "
+	fillW := width - lipgloss.Width(prefix)
+	if fillW < 1 {
+		fillW = 1
+	}
+	return sty.groupHeader.Render(prefix) + sty.dim.Render(strings.Repeat("─", fillW))
 }
 
 // formatHostRow renders one host's name, hostname, and tags as PLAIN text.

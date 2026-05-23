@@ -56,7 +56,7 @@ var helpSections = []struct {
 		{"esc", "cancel"},
 	}},
 	{"Global", []kb{
-		{"^C", "quit mterm"},
+		{"^C", "quit (asks to confirm)"},
 	}},
 }
 

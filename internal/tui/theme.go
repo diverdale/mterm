@@ -90,7 +90,7 @@ func buildStyles(t Theme) styleSet {
 		footerInfo:   lipgloss.NewStyle().Foreground(t.Dim),
 		prefixBadge:  lipgloss.NewStyle().Background(t.Accent).Foreground(onAccent).Bold(true).Padding(0, 1),
 		selectionBar: lipgloss.NewStyle().Background(t.Accent).Foreground(onAccent),
-		groupHeader:  lipgloss.NewStyle().Foreground(t.Dim).Bold(true),
+		groupHeader:  lipgloss.NewStyle().Foreground(t.Accent).Bold(true),
 		search:       lipgloss.NewStyle().Foreground(t.Accent),
 		errorText:    lipgloss.NewStyle().Foreground(t.Error),
 		connected:    lipgloss.NewStyle().Foreground(t.Connected),
