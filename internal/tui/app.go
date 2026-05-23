@@ -387,15 +387,19 @@ func (a *App) sessionView() string {
 	if t == nil {
 		return a.pickerView()
 	}
-	title := sty.title.Render("mterm") + statusCount(len(a.tabs))
-	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2, sty)
+	s := sty
+	if t != nil {
+		s = chromeStylesFor(t.host.BorderColor)
+	}
+	title := s.title.Render("mterm") + statusCount(len(a.tabs))
+	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2, s)
 	footer := renderFooter(footerOpts{
 		hints:         []keyHint{{"^B", "menu"}, {"^B n", "next"}, {"^B x", "close"}},
 		info:          sessionInfo(t.host),
 		timer:         fmtUptime(t.uptime()),
 		prefixPending: a.prefixPending,
 		width:         a.width - 2,
-	}, sty)
+	}, s)
 	return renderWindow(windowOpts{
 		title:    title,
 		tabStrip: tabs,
@@ -403,7 +407,7 @@ func (a *App) sessionView() string {
 		footer:   footer,
 		width:    a.width,
 		height:   a.height,
-	}, sty)
+	}, s)
 }
 
 func (a *App) forwardsView() string {

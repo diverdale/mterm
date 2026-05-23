@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 
 	"mterm/internal/config"
 	mssh "mterm/internal/ssh"
@@ -467,5 +468,43 @@ func TestReloadHostsKeepsPickerNonNil(t *testing.T) {
 	reloadHosts(app)
 	if app.picker == nil {
 		t.Fatal("picker became nil after reloadHosts")
+	}
+}
+
+func TestAppSessionViewUsesHostBorderColor(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.TrueColor) })
+
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+	host := config.Host{Name: "prod", HostName: "prod", Port: 22, BorderColor: "#FF3344"}
+	app.tabs = []*sessionTab{newSessionTab(1, host, 80, 24)}
+	app.active = 0
+
+	got := app.View()
+
+	// Truecolor escape for #FF3344 is "\x1b[38;2;255;51;68m"
+	want := "\x1b[38;2;255;51;68m"
+	if !strings.Contains(got, want) {
+		t.Fatalf("session view missing host border color escape %q\noutput:\n%s", want, got)
+	}
+}
+
+func TestAppSessionViewIgnoresEmptyBorderColor(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.TrueColor) })
+
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+	host := config.Host{Name: "plain", HostName: "plain", Port: 22}
+	app.tabs = []*sessionTab{newSessionTab(1, host, 80, 24)}
+	app.active = 0
+
+	got := app.View()
+	notWant := "\x1b[38;2;255;51;68m"
+	if strings.Contains(got, notWant) {
+		t.Fatalf("session view contains unexpected color escape %q", notWant)
 	}
 }
