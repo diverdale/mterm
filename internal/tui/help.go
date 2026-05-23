@@ -58,7 +58,7 @@ var helpSections = []struct {
 		{"esc", "cancel"},
 	}},
 	{"Global", []kb{
-		{"^C", "quit (asks to confirm)"},
+		{"^C", "passes through to remote (quit is ^B q)"},
 		{"logs", "~/.config/" + appmeta.DirName + "/logs/"},
 	}},
 }

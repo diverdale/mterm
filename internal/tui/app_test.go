@@ -426,95 +426,18 @@ func TestAppHelpClosedRestoresPrevMode(t *testing.T) {
 	}
 }
 
-func TestAppCtrlCFromPickerOpensQuitConfirm(t *testing.T) {
-	app := newTestApp()
-	app.width, app.height = 80, 24
-	// startup mode is modePicker
-	if cmd := app.update(tea.KeyMsg{Type: tea.KeyCtrlC}); cmd != nil {
-		t.Fatalf("Ctrl-C should not immediately quit; got cmd %T", cmd())
-	}
-	if app.mode != modeQuitConfirm {
-		t.Fatalf("mode = %v, want modeQuitConfirm", app.mode)
-	}
-	if app.quitConfirm == nil {
-		t.Fatal("quitConfirm is nil")
-	}
-	if app.prevMode != modePicker {
-		t.Fatalf("prevMode = %v, want modePicker", app.prevMode)
-	}
-}
-
-func TestAppCtrlCFromSessionOpensQuitConfirm(t *testing.T) {
+func TestAppCtrlCPassesThroughToSession(t *testing.T) {
+	// Ctrl-C is the universal "interrupt remote process" signal — mterm
+	// must NOT intercept it. Quit is on the deliberate ^B q two-step.
 	app := newTestApp()
 	app.width, app.height = 80, 24
 	app.mode = modeSession
 	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
 	app.active = 0
 
-	app.update(tea.KeyMsg{Type: tea.KeyCtrlC})
-	if app.mode != modeQuitConfirm {
-		t.Fatalf("mode = %v, want modeQuitConfirm", app.mode)
-	}
-	if app.quitConfirm.tabCount != 1 {
-		t.Fatalf("tabCount = %d, want 1", app.quitConfirm.tabCount)
-	}
-}
-
-func TestAppQuitConfirmYesEmitsConfirmed(t *testing.T) {
-	app := newTestApp()
-	app.mode = modeQuitConfirm
-	app.quitConfirm = newQuitConfirmModel(0)
-	cmd := app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
-	if cmd == nil {
-		t.Fatal("y must return a non-nil cmd")
-	}
-	if _, ok := cmd().(quitConfirmedMsg); !ok {
-		t.Fatalf("cmd() = %T, want quitConfirmedMsg", cmd())
-	}
-}
-
-func TestAppQuitConfirmEnterEmitsConfirmed(t *testing.T) {
-	app := newTestApp()
-	app.mode = modeQuitConfirm
-	app.quitConfirm = newQuitConfirmModel(0)
-	cmd := app.update(tea.KeyMsg{Type: tea.KeyEnter})
-	if _, ok := cmd().(quitConfirmedMsg); !ok {
-		t.Fatalf("cmd() = %T, want quitConfirmedMsg", cmd())
-	}
-}
-
-func TestAppQuitConfirmEscCancels(t *testing.T) {
-	app := newTestApp()
-	app.mode = modeQuitConfirm
-	app.prevMode = modeSession
-	app.quitConfirm = newQuitConfirmModel(0)
-	// Esc → cmd that produces quitCancelledMsg → handler flips mode back.
-	cmd := app.update(tea.KeyMsg{Type: tea.KeyEsc})
-	if cmd == nil {
-		t.Fatal("Esc in modeQuitConfirm must return a cancel cmd")
-	}
-	app.update(cmd())
-	if app.mode != modeSession {
-		t.Fatalf("mode = %v, want modeSession after Esc", app.mode)
-	}
-}
-
-func TestAppCtrlCInQuitConfirmCancels(t *testing.T) {
-	// A second Ctrl-C while the modal is open should cancel, not quit —
-	// the panic-press case.
-	app := newTestApp()
-	app.width, app.height = 80, 24
-	app.mode = modePicker
-	app.update(tea.KeyMsg{Type: tea.KeyCtrlC}) // opens modal
-	if app.mode != modeQuitConfirm {
-		t.Fatalf("first Ctrl-C did not open modal: mode = %v", app.mode)
-	}
-	cmd := app.update(tea.KeyMsg{Type: tea.KeyCtrlC}) // second Ctrl-C cancels
+	cmd := app.update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	if cmd != nil {
-		t.Fatalf("second Ctrl-C should not return a cmd; got %T", cmd())
-	}
-	if app.mode != modePicker {
-		t.Fatalf("mode = %v, want modePicker after second Ctrl-C", app.mode)
+		t.Fatalf("Ctrl-C in session mode must not return a cmd; got %T", cmd())
 	}
 }
 
@@ -597,17 +520,13 @@ func TestShowLogPathReportsDisabledWhenLoggerAbsent(t *testing.T) {
 	}
 }
 
-func TestAppPrefixQStillQuitsDirectly(t *testing.T) {
-	// ^B q is deliberate two-step → bypass the confirm modal.
+func TestAppPrefixQQuits(t *testing.T) {
 	app := newTestApp()
 	app.mode = modeSession
 	app.prefixPending = true
 	cmd := app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	if cmd == nil {
-		t.Fatal("^B q must return a quit cmd directly, not open the modal")
-	}
-	if app.mode == modeQuitConfirm {
-		t.Fatal("^B q must not open the confirm modal")
+		t.Fatal("^B q must return a quit cmd")
 	}
 }
 

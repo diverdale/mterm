@@ -22,7 +22,6 @@ const (
 	modeForwards
 	modePalette
 	modeHelp
-	modeQuitConfirm
 )
 
 // renderInterval is the coalesced redraw cadence (~30 fps).
@@ -49,15 +48,14 @@ type App struct {
 	mode          viewMode
 	prefixPending bool
 
-	picker      *picker
-	forwards    *forwardsPanel
-	palette     *paletteModel
-	help        *helpModel
-	quitConfirm *quitConfirmModel
-	prevMode    viewMode
-	tabs        []*sessionTab
-	active      int
-	nextID      int
+	picker   *picker
+	forwards *forwardsPanel
+	palette  *paletteModel
+	help     *helpModel
+	prevMode viewMode
+	tabs     []*sessionTab
+	active   int
+	nextID   int
 
 	width, height int
 	statusMsg     string
@@ -145,13 +143,6 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 		a.mode = a.prevMode
 		return nil
 
-	case quitConfirmedMsg:
-		return a.shutdown()
-
-	case quitCancelledMsg:
-		a.mode = a.prevMode
-		return nil
-
 	case connectedMsg:
 		a.handleConnected(m)
 		return nil
@@ -160,25 +151,9 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 }
 
 func (a *App) handleKey(k tea.KeyMsg) tea.Cmd {
-	// Ctrl-C opens (or, when already open, cancels) the quit-confirm modal.
-	// ^B q remains the deliberate quit-without-prompt path.
-	if k.Type == tea.KeyCtrlC {
-		a.prefixPending = false
-		if a.mode == modeQuitConfirm {
-			a.mode = a.prevMode
-			return nil
-		}
-		a.prevMode = a.mode
-		a.quitConfirm = newQuitConfirmModel(len(a.tabs))
-		a.mode = modeQuitConfirm
-		return nil
-	}
-
 	// Modal overlays consume every key as their own input — the prefix
 	// machine and mode dispatch below do not apply.
 	switch a.mode {
-	case modeQuitConfirm:
-		return a.quitConfirm.Update(k)
 	case modePalette:
 		return a.palette.Update(k)
 	case modeHelp:
@@ -391,10 +366,6 @@ func (a *App) View() string {
 		return lipgloss.Place(a.width, a.height,
 			lipgloss.Center, lipgloss.Center,
 			a.help.View())
-	case modeQuitConfirm:
-		return lipgloss.Place(a.width, a.height,
-			lipgloss.Center, lipgloss.Center,
-			a.quitConfirm.View())
 	default:
 		return a.pickerView()
 	}
