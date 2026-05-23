@@ -59,16 +59,20 @@ var sty = buildStyles(active)
 // the four host-tinted styles use c instead of the theme's Frame/Accent.
 // When c is "", returns the global sty unchanged so callers can use this
 // unconditionally.
+//
+// The override preserves every non-Foreground attribute of the base style
+// (Bold, Italic, etc.) by copying-then-replacing the foreground, so future
+// theme tweaks like adding Italic to title carry through automatically.
 func chromeStylesFor(c string) styleSet {
 	if c == "" {
 		return sty
 	}
 	col := lipgloss.Color(c)
 	s := sty
-	s.border = lipgloss.NewStyle().Foreground(col)
-	s.title = lipgloss.NewStyle().Foreground(col).Bold(true)
-	s.tabActive = lipgloss.NewStyle().Foreground(col).Bold(true)
-	s.footerInfo = lipgloss.NewStyle().Foreground(col)
+	s.border = sty.border.Foreground(col)
+	s.title = sty.title.Foreground(col)
+	s.tabActive = sty.tabActive.Foreground(col)
+	s.footerInfo = sty.footerInfo.Foreground(col)
 	return s
 }
 

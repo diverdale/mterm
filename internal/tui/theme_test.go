@@ -56,6 +56,19 @@ func TestChromeStylesForOverridesHostTintedStyles(t *testing.T) {
 	}
 }
 
+func TestChromeStylesForPreservesBoldOnOverride(t *testing.T) {
+	// title and tabActive are bold in the base theme; the host-color override
+	// must inherit that — otherwise a future theme tweak that adds Italic or
+	// Underline would silently get dropped on host-tinted tabs.
+	s := chromeStylesFor("#FF3344")
+	if !s.title.GetBold() {
+		t.Errorf("title lost Bold after override")
+	}
+	if !s.tabActive.GetBold() {
+		t.Errorf("tabActive lost Bold after override")
+	}
+}
+
 func TestChromeStylesForPreservesUntintedStyles(t *testing.T) {
 	s := chromeStylesFor("#FF3344")
 	// These stay theme colors and must not be overridden.
