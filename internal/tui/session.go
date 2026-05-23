@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+	"os"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -106,7 +108,9 @@ func (t *sessionTab) attach(s *mssh.Session) {
 const snapshotInterval = 33 * time.Millisecond
 
 // snapshotLoop refreshes the rendered VT string at snapshotInterval until
-// the session ends.
+// the session ends. Each render runs inside takeSnapshot, which recovers
+// from panics so a single bad VT state cannot kill the snapshot goroutine
+// and permanently freeze the tab's view.
 func (t *sessionTab) snapshotLoop() {
 	ticker := time.NewTicker(snapshotInterval)
 	defer ticker.Stop()
@@ -114,9 +118,22 @@ func (t *sessionTab) snapshotLoop() {
 		if t.ended.Load() {
 			return
 		}
-		rendered := t.term.Render()
-		t.snapshot.Store(&rendered)
+		t.takeSnapshot()
 	}
+}
+
+// takeSnapshot renders the VT into a fresh string and stores it. A panic in
+// Render leaves the existing snapshot in place (so the user sees the last
+// good frame) and prints a one-line diagnostic to stderr; the next tick
+// tries again.
+func (t *sessionTab) takeSnapshot() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "mterm: snapshot panic for tab %d (%s): %v\n", t.id, t.host.Name, r)
+		}
+	}()
+	rendered := t.term.Render()
+	t.snapshot.Store(&rendered)
 }
 
 // readLoop copies remote output into the emulator (and the session log, when

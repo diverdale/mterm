@@ -93,6 +93,14 @@ func (t *Terminal) Render() string {
 	pos := t.vt.CursorPosition()
 	cx, cy := pos.X, pos.Y
 
+	// Defensive: cursor position can briefly fall outside the screen during
+	// resize, vi's full-screen takeover, or a CUP placing the cursor past
+	// the right margin. CellAt / SetCell on out-of-bounds coordinates can
+	// panic in xvt. Skip cursor injection rather than crash.
+	if cx < 0 || cy < 0 || cx >= t.w || cy >= t.h {
+		return t.vt.Render()
+	}
+
 	orig := t.vt.CellAt(cx, cy)
 
 	// Fix 1: if the cursor lands on a wide-char continuation cell (Width==0),
