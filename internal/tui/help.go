@@ -6,6 +6,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"mterm/internal/appmeta"
 )
 
 // helpClosedMsg dismisses the help overlay.
@@ -57,13 +59,14 @@ var helpSections = []struct {
 	}},
 	{"Global", []kb{
 		{"^C", "quit (asks to confirm)"},
+		{"logs", "~/.config/" + appmeta.DirName + "/logs/"},
 	}},
 }
 
 // View renders the keybinding table inside a rounded modal box.
 func (h *helpModel) View() string {
 	var b strings.Builder
-	b.WriteString(sty.title.Render("mterm — keybindings"))
+	b.WriteString(sty.title.Render(appmeta.Name + " — keybindings"))
 	b.WriteString("\n")
 	for _, sec := range helpSections {
 		b.WriteString("\n")

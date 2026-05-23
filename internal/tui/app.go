@@ -7,7 +7,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"mterm/internal/appmeta"
 	"mterm/internal/config"
+	"mterm/internal/sessionlog"
 	mssh "mterm/internal/ssh"
 )
 
@@ -59,7 +61,8 @@ type App struct {
 
 	width, height int
 	statusMsg     string
-	tickCount     int // render-tick counter, drives status spinners
+	tickCount     int    // render-tick counter, drives status spinners
+	logRoot       string // root dir for per-session logs; "" disables logging
 }
 
 // NewApp builds the root model.
@@ -71,6 +74,10 @@ func NewApp(hosts []config.Host, connect Connector) *App {
 		nextID:  1,
 	}
 }
+
+// SetLogRoot sets the per-session log directory. Empty disables logging for
+// every tab regardless of host opt-in. Call before Run.
+func (a *App) SetLogRoot(path string) { a.logRoot = path }
 
 // Init starts the render ticker.
 func (a *App) Init() tea.Cmd {
@@ -347,7 +354,23 @@ func (a *App) handleConnected(m connectedMsg) {
 		a.removeTabAt(idx)
 		return
 	}
+	a.openLoggerForTab(a.tabs[idx])
 	a.tabs[idx].attach(m.sess)
+}
+
+// openLoggerForTab tries to open a session log for the tab. Errors surface to
+// statusMsg but never block the connection — logging is best-effort.
+func (a *App) openLoggerForTab(t *sessionTab) {
+	if a.logRoot == "" || !t.host.Logging() {
+		return
+	}
+	path := sessionlog.PathFor(a.logRoot, t.host.Name, time.Now())
+	lg, err := sessionlog.Open(path)
+	if err != nil {
+		a.statusMsg = fmt.Sprintf("log %s: %v", t.host.Name, err)
+		return
+	}
+	t.setLogger(lg)
 }
 
 // View renders the current view as a framed window.
@@ -398,7 +421,7 @@ func (a *App) pickerView() string {
 		body += "\n" + sty.errorText.Render("  "+a.statusMsg)
 	}
 	return renderWindow(windowOpts{
-		title:  sty.title.Render("mterm"),
+		title:  sty.title.Render(appmeta.Name),
 		body:   body,
 		footer: footer,
 		width:  a.width,
@@ -412,7 +435,7 @@ func (a *App) sessionView() string {
 		return a.pickerView()
 	}
 	s := chromeStylesFor(t.host.BorderColor)
-	title := s.title.Render("mterm") + statusCount(len(a.tabs))
+	title := s.title.Render(appmeta.Name) + statusCount(len(a.tabs))
 	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2, s)
 	footer := renderFooter(footerOpts{
 		hints:         []keyHint{{"^B", "menu"}, {"^B n", "next"}, {"^B x", "close"}},

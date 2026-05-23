@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	gossh "golang.org/x/crypto/ssh"
 
+	"mterm/internal/appmeta"
 	"mterm/internal/config"
 	mssh "mterm/internal/ssh"
 	"mterm/internal/tui"
@@ -15,7 +16,7 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "mterm:", err)
+		fmt.Fprintln(os.Stderr, appmeta.Name+":", err)
 		os.Exit(1)
 	}
 }
@@ -26,10 +27,11 @@ func run() error {
 		return err
 	}
 	for _, w := range res.Warnings {
-		fmt.Fprintln(os.Stderr, "mterm: warning:", w)
+		fmt.Fprintln(os.Stderr, appmeta.Name+": warning:", w)
 	}
 	if len(res.Hosts) == 0 {
-		return fmt.Errorf("no hosts found in ~/.ssh/config or ~/.config/mterm/hosts.yaml")
+		hostsPath, _ := config.HostsFile()
+		return fmt.Errorf("no hosts found in ~/.ssh/config or %s", hostsPath)
 	}
 
 	auth, err := mssh.AgentProviderFromEnv()
@@ -56,6 +58,9 @@ func run() error {
 	}
 
 	app := tui.NewApp(res.Hosts, connect)
+	if logsDir, err := config.LogsDir(); err == nil {
+		app.SetLogRoot(logsDir)
+	}
 	p := tea.NewProgram(app, tea.WithAltScreen())
 	_, err = p.Run()
 	return err

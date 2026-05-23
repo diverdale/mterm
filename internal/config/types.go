@@ -1,6 +1,10 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+
+	"mterm/internal/appmeta"
+)
 
 type Source int
 
@@ -11,7 +15,7 @@ const (
 
 func (s Source) String() string {
 	if s == SourceMterm {
-		return "mterm"
+		return appmeta.Name
 	}
 	return "ssh_config"
 }
@@ -52,6 +56,21 @@ type Host struct {
 	ProxyJump    string // parsed now, used when jump-host support lands
 	Forwards     []Forward
 	BorderColor  string // hex like "#RRGGBB" or "#RGB"; "" = no override
+
+	// Log is a tri-state opt-in/out for per-session output logging:
+	//   nil   → use the default (logging on)
+	//   true  → explicitly on
+	//   false → explicitly off
+	Log *bool
+}
+
+// Logging reports whether per-session output should be logged for this host.
+// Default is on; only an explicit `log: false` disables it.
+func (h Host) Logging() bool {
+	if h.Log != nil {
+		return *h.Log
+	}
+	return true
 }
 
 // Addr returns the host:port dial string.

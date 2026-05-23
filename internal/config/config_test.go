@@ -331,6 +331,40 @@ func TestLoadAndMergeAddressFallsBackToName(t *testing.T) {
 	}
 }
 
+func TestLoadAndMergeLogTriState(t *testing.T) {
+	// Default = on (nil Log → Logging() == true).
+	// Explicit log: false → off.
+	// Explicit log: true → on.
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: default-on
+    address: 10.0.0.1
+  - name: explicit-off
+    address: 10.0.0.2
+    log: false
+  - name: explicit-on
+    address: 10.0.0.3
+    log: true
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{
+		"default-on":   true,
+		"explicit-off": false,
+		"explicit-on":  true,
+	}
+	for _, h := range res.Hosts {
+		if want[h.Name] != h.Logging() {
+			t.Errorf("host %q Logging() = %v, want %v", h.Name, h.Logging(), want[h.Name])
+		}
+	}
+}
+
 func TestLoadAndMergeNameAliasConflictWarns(t *testing.T) {
 	// `name: foo` and `hostname: bar` together: name wins, but a warning
 	// surfaces so the user knows the hostname field was dropped.

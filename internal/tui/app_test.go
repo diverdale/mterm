@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"mterm/internal/appmeta"
 	"mterm/internal/config"
 	mssh "mterm/internal/ssh"
 )
@@ -288,8 +290,8 @@ func TestAppViewIsFramed(t *testing.T) {
 	if !strings.Contains(lines[0], "┌") {
 		t.Fatalf("picker view is not framed; line 0 = %q", lines[0])
 	}
-	if !strings.Contains(out, "mterm") {
-		t.Fatal("picker frame title should say mterm")
+	if !strings.Contains(out, appmeta.Name) {
+		t.Fatalf("picker frame title should contain %q", appmeta.Name)
 	}
 }
 
@@ -513,6 +515,85 @@ func TestAppCtrlCInQuitConfirmCancels(t *testing.T) {
 	}
 	if app.mode != modePicker {
 		t.Fatalf("mode = %v, want modePicker after second Ctrl-C", app.mode)
+	}
+}
+
+func TestOpenLoggerForTabRespectsHostOptOut(t *testing.T) {
+	dir := t.TempDir()
+	app := newTestApp()
+	app.SetLogRoot(dir)
+	off := false
+	host := config.Host{Name: "noisy", HostName: "noisy", Port: 22, Log: &off}
+	tab := newSessionTab(1, host, 80, 24)
+
+	app.openLoggerForTab(tab)
+	if tab.logPath() != "" {
+		t.Fatalf("logger should not be opened when host.Log == false; got path %q", tab.logPath())
+	}
+}
+
+func TestOpenLoggerForTabRespectsEmptyLogRoot(t *testing.T) {
+	app := newTestApp()
+	// app.logRoot intentionally left empty (test default)
+	host := config.Host{Name: "noisy", HostName: "noisy", Port: 22}
+	tab := newSessionTab(1, host, 80, 24)
+
+	app.openLoggerForTab(tab)
+	if tab.logPath() != "" {
+		t.Fatalf("logger should not be opened with empty logRoot; got %q", tab.logPath())
+	}
+}
+
+func TestOpenLoggerForTabCreatesFileWhenEnabled(t *testing.T) {
+	dir := t.TempDir()
+	app := newTestApp()
+	app.SetLogRoot(dir)
+	host := config.Host{Name: "talky", HostName: "talky", Port: 22}
+	tab := newSessionTab(1, host, 80, 24)
+	t.Cleanup(tab.close)
+
+	app.openLoggerForTab(tab)
+	p := tab.logPath()
+	if p == "" {
+		t.Fatal("expected a log path after openLoggerForTab")
+	}
+	if _, err := os.Stat(p); err != nil {
+		t.Fatalf("expected log file at %s: %v", p, err)
+	}
+	if !strings.Contains(p, dir) || !strings.Contains(p, "talky") {
+		t.Fatalf("path %q should be under logRoot %q and contain host name", p, dir)
+	}
+}
+
+func TestShowLogPathSurfacesViaStatus(t *testing.T) {
+	dir := t.TempDir()
+	app := newTestApp()
+	app.SetLogRoot(dir)
+	host := config.Host{Name: "talky", HostName: "talky", Port: 22}
+	tab := newSessionTab(1, host, 80, 24)
+	app.tabs = []*sessionTab{tab}
+	app.active = 0
+	app.openLoggerForTab(tab)
+	t.Cleanup(tab.close)
+
+	showLogPath(app)
+	if !strings.HasPrefix(app.statusMsg, "log: ") {
+		t.Fatalf("statusMsg should start with %q; got %q", "log: ", app.statusMsg)
+	}
+	if !strings.Contains(app.statusMsg, tab.logPath()) {
+		t.Fatalf("statusMsg %q should contain log path %q", app.statusMsg, tab.logPath())
+	}
+}
+
+func TestShowLogPathReportsDisabledWhenLoggerAbsent(t *testing.T) {
+	app := newTestApp()
+	host := config.Host{Name: "quiet", HostName: "quiet", Port: 22}
+	tab := newSessionTab(1, host, 80, 24)
+	app.tabs = []*sessionTab{tab}
+	app.active = 0
+	showLogPath(app)
+	if !strings.Contains(app.statusMsg, "not enabled") {
+		t.Fatalf("statusMsg should report disabled; got %q", app.statusMsg)
 	}
 }
 

@@ -32,6 +32,7 @@ type mtermHost struct {
 	Tags        []string       `yaml:"tags"`
 	Forwards    []mtermForward `yaml:"forwards"`
 	BorderColor string         `yaml:"bordercolor"`
+	Log         *bool          `yaml:"log"` // nil = default-on; false = opt-out
 }
 
 // canonicalNameAlias folds name/hostname/host into the single Name field.

@@ -6,6 +6,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"mterm/internal/appmeta"
 )
 
 // quitConfirmedMsg dispatches the actual shutdown after the user said yes.
@@ -52,7 +54,7 @@ func (q *quitConfirmModel) View() string {
 	}
 
 	var b strings.Builder
-	b.WriteString(sty.title.Render("Quit mterm?"))
+	b.WriteString(sty.title.Render("Quit " + appmeta.Name + "?"))
 	b.WriteString("\n\n")
 	b.WriteString(body)
 	b.WriteString("\n\n")

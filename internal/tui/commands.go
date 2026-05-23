@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"mterm/internal/appmeta"
 	"mterm/internal/config"
 )
 
@@ -47,7 +48,7 @@ func buildCommands(a *App) []command {
 			a.closeActiveTab()
 			return nil
 		}},
-		command{label: "Quit mterm", group: "Navigation", action: func(a *App) tea.Cmd {
+		command{label: "Quit " + appmeta.Name, group: "Navigation", action: func(a *App) tea.Cmd {
 			return a.shutdown()
 		}},
 	)
@@ -98,7 +99,31 @@ func buildCommands(a *App) []command {
 		action: func(a *App) tea.Cmd { reloadHosts(a); return nil },
 	})
 
+	// Session
+	cmds = append(cmds, command{
+		label:  "Show log path for current tab",
+		group:  "Session",
+		action: func(a *App) tea.Cmd { showLogPath(a); return nil },
+	})
+
 	return cmds
+}
+
+// showLogPath surfaces the active tab's session-log file path via statusMsg
+// so the user can grab it (mouse-select / Cmd-C in their terminal). System
+// clipboard write would need OSC52 plumbing — deferred.
+func showLogPath(a *App) {
+	t := a.activeTab()
+	if t == nil {
+		a.statusMsg = "log: no active tab"
+		return
+	}
+	p := t.logPath()
+	if p == "" {
+		a.statusMsg = "log: not enabled for " + t.host.Name
+		return
+	}
+	a.statusMsg = "log: " + p
 }
 
 // reloadHosts re-reads the config files and replaces the picker's host list.

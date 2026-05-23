@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"mterm/internal/config"
+	"mterm/internal/sessionlog"
 	mssh "mterm/internal/ssh"
 	"mterm/internal/terminal"
 )
@@ -45,10 +46,11 @@ type sessionTab struct {
 	id      int
 	host    config.Host
 	term    *terminal.Terminal
-	sess    atomic.Pointer[mssh.Session] // nil until connected
-	ended   atomic.Bool                  // set once the reader goroutine exits
-	w, h    int                          // full tab area including the tab bar
-	started time.Time                    // when this tab was opened
+	sess    atomic.Pointer[mssh.Session]      // nil until connected
+	logger  atomic.Pointer[sessionlog.Logger] // optional; nil = no logging
+	ended   atomic.Bool                       // set once the reader goroutine exits
+	w, h    int                               // full tab area including the tab bar
+	started time.Time                         // when this tab was opened
 }
 
 // newSessionTab creates a tab sized to the given total area.
@@ -79,9 +81,9 @@ func (t *sessionTab) attach(s *mssh.Session) {
 	go t.readLoop()
 }
 
-// readLoop copies remote output into the emulator until the session ends. It
-// recovers from panics so one bad session cannot crash the program, and marks
-// the tab ended on exit so the app can reap it.
+// readLoop copies remote output into the emulator (and the session log, when
+// set) until the session ends. Recovers from panics so one bad session cannot
+// crash the program, and marks the tab ended on exit so the app can reap it.
 func (t *sessionTab) readLoop() {
 	defer func() {
 		_ = recover()
@@ -96,6 +98,11 @@ func (t *sessionTab) readLoop() {
 		n, err := s.Read(buf)
 		if n > 0 {
 			t.term.Write(buf[:n])
+			if l := t.logger.Load(); l != nil {
+				// Best-effort: a log write failure does not interrupt the
+				// session. Closed-file errors during shutdown are expected.
+				_, _ = l.Write(buf[:n])
+			}
 		}
 		if err != nil {
 			return
@@ -125,12 +132,28 @@ func (t *sessionTab) View() string {
 	return t.term.Render()
 }
 
-// close terminates the session.
+// close terminates the session and flushes any open log file.
 func (t *sessionTab) close() {
 	if s := t.sess.Load(); s != nil {
 		_ = s.Close()
 	}
 	t.sess.Store(nil)
+	if l := t.logger.Swap(nil); l != nil {
+		_ = l.Close()
+	}
+}
+
+// setLogger attaches a session log; nil disables logging for this tab.
+func (t *sessionTab) setLogger(l *sessionlog.Logger) {
+	t.logger.Store(l)
+}
+
+// logPath returns the active log file path for this tab, or "" if none.
+func (t *sessionTab) logPath() string {
+	if l := t.logger.Load(); l != nil {
+		return l.Path()
+	}
+	return ""
 }
 
 // h2body converts a full tab area (w, h) into the inner terminal body size,

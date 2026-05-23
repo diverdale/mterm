@@ -13,15 +13,18 @@ type Result struct {
 	Warnings []string // non-fatal problems (parse errors, etc.)
 }
 
-// Load reads ~/.ssh/config and ~/.config/mterm/hosts.yaml and merges them.
+// Load reads ~/.ssh/config and the app hosts.yaml and merges them.
 func Load() (*Result, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
 	}
 	sshPath := filepath.Join(home, ".ssh", "config")
-	mtermPath := filepath.Join(home, ".config", "mterm", "hosts.yaml")
-	return loadAndMerge(sshPath, mtermPath)
+	hostsPath, err := HostsFile()
+	if err != nil {
+		return nil, err
+	}
+	return loadAndMerge(sshPath, hostsPath)
 }
 
 // loadAndMerge is the testable core of Load.
@@ -114,6 +117,9 @@ func applyOverlay(h *Host, mh mtermHost) {
 	if mh.BorderColor != "" {
 		h.BorderColor = mh.BorderColor
 	}
+	if mh.Log != nil {
+		h.Log = mh.Log
+	}
 }
 
 func hostFromMterm(mh mtermHost) Host {
@@ -139,5 +145,6 @@ func hostFromMterm(mh mtermHost) Host {
 		Source:      SourceMterm,
 		Forwards:    forwards,
 		BorderColor: mh.BorderColor,
+		Log:         mh.Log,
 	}
 }

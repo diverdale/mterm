@@ -18,6 +18,11 @@ XL ≈ structural change to the app, multiple branches.
 - Auto-reconnect on transport failures
 - Fuzzy host picker reading `~/.ssh/config` + `~/.config/mterm/hosts.yaml`
 - Themable UI (Midnight / Matrix / Synthwave) with frame, tab strip, footer
+- Per-host visual identity (`bordercolor:` tints frame / active tab / footer hints)
+- Per-session output logging to `~/.config/mterm/logs/<host>/<timestamp>.log`
+  (default-on; per-host `log: false` opt-out; "Show log path for current tab"
+  palette command)
+- Quit-confirm modal on `Ctrl-C` (`^B q` keeps quitting directly)
 - Command palette (`^B :`) and help overlay (`^B ?`)
 - Port-forwarding plumbing (panel exists; integration deferred)
 - Per-tab session timer, animated status spinner
