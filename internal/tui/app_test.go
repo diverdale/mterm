@@ -389,6 +389,21 @@ func TestAppPrefixQuestionOpensHelp(t *testing.T) {
 	}
 }
 
+func TestAppPrefixWorksInPickerMode(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	// App starts in picker mode by default. Prefix used to be ignored here.
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
+
+	if app.mode != modePalette {
+		t.Fatalf("after ^B : from picker, mode = %v, want modePalette", app.mode)
+	}
+	if app.prevMode != modePicker {
+		t.Fatalf("prevMode = %v, want modePicker", app.prevMode)
+	}
+}
+
 func TestAppPaletteClosedRestoresPrevMode(t *testing.T) {
 	app := newTestApp()
 	app.mode = modePalette

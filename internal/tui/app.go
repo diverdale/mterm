@@ -149,28 +149,33 @@ func (a *App) handleKey(k tea.KeyMsg) tea.Cmd {
 		return a.shutdown()
 	}
 
+	// The palette and help overlays are modal text inputs — the prefix does
+	// not apply inside them.
+	switch a.mode {
+	case modePalette:
+		return a.palette.Update(k)
+	case modeHelp:
+		return a.help.Update(k)
+	}
+
+	// Prefix state machine is global to picker / session / forwards so
+	// ^B : (palette) and ^B ? (help) work from anywhere.
+	if a.prefixPending {
+		a.prefixPending = false
+		return a.handleCommandKey(k)
+	}
+	if isPrefixKey(k) {
+		a.prefixPending = true
+		return nil
+	}
+
+	// Non-prefix keys go to the mode's own model.
 	switch a.mode {
 	case modePicker:
 		return a.picker.Update(k)
-
 	case modeForwards:
 		return a.forwards.Update(k)
-
-	case modePalette:
-		return a.palette.Update(k)
-
-	case modeHelp:
-		return a.help.Update(k)
-
 	case modeSession:
-		if a.prefixPending {
-			a.prefixPending = false
-			return a.handleCommandKey(k)
-		}
-		if isPrefixKey(k) {
-			a.prefixPending = true
-			return nil
-		}
 		if t := a.activeTab(); t != nil {
 			t.sendInput(keyToBytes(k))
 		}
