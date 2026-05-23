@@ -387,10 +387,7 @@ func (a *App) sessionView() string {
 	if t == nil {
 		return a.pickerView()
 	}
-	s := sty
-	if t != nil {
-		s = chromeStylesFor(t.host.BorderColor)
-	}
+	s := chromeStylesFor(t.host.BorderColor)
 	title := s.title.Render("mterm") + statusCount(len(a.tabs))
 	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2, s)
 	footer := renderFooter(footerOpts{
