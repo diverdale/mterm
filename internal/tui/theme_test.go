@@ -24,17 +24,20 @@ func TestBuildStylesUsesThemeColors(t *testing.T) {
 
 func TestChromeStylesForEmptyReturnsGlobal(t *testing.T) {
 	s := chromeStylesFor("")
+	// Compare colors AND bold attributes — a buggy "rebuild styles on empty"
+	// implementation would likely reproduce the colors but drop bold on
+	// title/tabActive, and this test should catch that.
 	if s.border.GetForeground() != sty.border.GetForeground() {
-		t.Fatalf("empty override should match global sty.border foreground")
+		t.Fatalf("border foreground differs from global")
 	}
-	if s.title.GetForeground() != sty.title.GetForeground() {
-		t.Fatalf("empty override should match global sty.title foreground")
+	if s.title.GetForeground() != sty.title.GetForeground() || s.title.GetBold() != sty.title.GetBold() {
+		t.Fatalf("title style differs from global (fg or bold)")
 	}
-	if s.tabActive.GetForeground() != sty.tabActive.GetForeground() {
-		t.Fatalf("empty override should match global sty.tabActive foreground")
+	if s.tabActive.GetForeground() != sty.tabActive.GetForeground() || s.tabActive.GetBold() != sty.tabActive.GetBold() {
+		t.Fatalf("tabActive style differs from global (fg or bold)")
 	}
 	if s.footerInfo.GetForeground() != sty.footerInfo.GetForeground() {
-		t.Fatalf("empty override should match global sty.footerInfo foreground")
+		t.Fatalf("footerInfo foreground differs from global")
 	}
 }
 
