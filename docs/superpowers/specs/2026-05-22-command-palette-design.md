@@ -1,7 +1,7 @@
 # mterm Command Palette & Help — Design
 
 **Date:** 2026-05-22
-**Status:** Approved (proceed-and-build)
+**Status:** Approved (proceed-and-build); shipped — note: the palette key is `Ctrl-B :` in shipping code (the originally-specced `Ctrl-B p` conflicted with the existing prev-tab binding).
 
 ## Summary
 
