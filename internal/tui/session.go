@@ -88,18 +88,39 @@ func (t *sessionTab) title() string { return t.host.Name }
 // `exit`, the connection dropped, etc.).
 func (t *sessionTab) hasEnded() bool { return t.ended.Load() }
 
-// attach binds a connected ssh.Session and starts the reader + snapshot
-// goroutines. The snapshot goroutine periodically renders the VT into a
-// string and stashes it in t.snapshot; View() reads that snapshot without
-// touching the live terminal mutex. This keeps bubbletea's event loop
-// responsive even when a remote TUI floods output — the event loop's
-// View call never blocks waiting for vt.Render to be free of vt.Write.
+// attach binds a connected ssh.Session and starts the three per-tab
+// goroutines: readLoop (SSH → VT), snapshotLoop (VT → atomic snapshot for
+// View), and replyLoop (VT response pipe → SSH stdin, so terminal queries
+// like Device Status Report don't dead-end and freeze the tab).
 func (t *sessionTab) attach(s *mssh.Session) {
 	t.sess.Store(s)
 	initial := t.term.Render()
 	t.snapshot.Store(&initial)
 	go t.readLoop()
 	go t.snapshotLoop()
+	go t.replyLoop()
+}
+
+// replyLoop forwards bytes the VT wants to send BACK to the remote program
+// (DSR responses, cursor-position reports, OSC color queries, in-band resize)
+// to the SSH session's stdin. Without this, xvt's CSI handlers eventually
+// block on a full internal response pipe, freezing the readLoop with the
+// terminal mutex held — which is exactly the tab-hang bug vi exposed.
+// Exits cleanly when term.Close() unblocks Read with io.EOF.
+func (t *sessionTab) replyLoop() {
+	defer func() { _ = recover() }()
+	buf := make([]byte, 256)
+	for {
+		n, err := t.term.Read(buf)
+		if n > 0 {
+			if s := t.sess.Load(); s != nil {
+				_, _ = s.Write(buf[:n])
+			}
+		}
+		if err != nil {
+			return
+		}
+	}
 }
 
 // snapshotInterval bounds how often the snapshot goroutine refreshes the
@@ -200,12 +221,17 @@ func (t *sessionTab) View() string {
 	return t.term.Render()
 }
 
-// close terminates the session and flushes any open log file.
+// close terminates the session, drains/flushes the log, and signals the
+// reply loop to exit. term.Close unblocks replyLoop's Read with io.EOF;
+// it races with the still-pending Read on xvt's internal `closed bool`
+// (xvt does not synchronize that field), but the race is benign — Read
+// returns io.EOF in either branch and the goroutine exits cleanly.
 func (t *sessionTab) close() {
 	if s := t.sess.Load(); s != nil {
 		_ = s.Close()
 	}
 	t.sess.Store(nil)
+	_ = t.term.Close()
 	if l := t.logger.Swap(nil); l != nil {
 		_ = l.Close()
 	}

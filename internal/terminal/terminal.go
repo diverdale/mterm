@@ -134,3 +134,20 @@ func (t *Terminal) CursorPosition() (x, y int) {
 	pos := t.vt.CursorPosition()
 	return pos.X, pos.Y
 }
+
+// Read drains bytes the emulator wants to send BACK to the program — terminal
+// replies like Device Status Report (CSI n) responses, cursor-position
+// reports, OSC color queries, in-band resize, etc. The caller's reader
+// goroutine forwards these to the SSH session's stdin. The underlying pipe
+// is goroutine-safe, so this does NOT take t.mu — taking it here would
+// deadlock with Write inside the CSI handler that produced the reply.
+func (t *Terminal) Read(p []byte) (int, error) {
+	return t.vt.Read(p)
+}
+
+// Close releases the emulator's internal response pipe, unblocking any
+// pending Reader with io.EOF. Safe to call once; idempotent on the
+// underlying pipe.
+func (t *Terminal) Close() error {
+	return t.vt.Close()
+}

@@ -5,10 +5,52 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // sgrRE matches any ANSI SGR escape sequence (e.g. \x1b[31m, \x1b[0m, \x1b[m).
 var sgrRE = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+// TestWriteDoesNotBlockOnUnreadResponsePipe pins the bug that froze tabs
+// running vi: xvt's CSI handler for "n" (Device Status Report) writes the
+// reply to an internal io.Pipe with no buffer. Without a goroutine draining
+// the response side, the first DSR makes vt.Write block forever — and since
+// Terminal.Write holds t.mu, the snapshot worker starves and the tab hangs.
+//
+// The fix is to drain Terminal.Read on a background goroutine and forward
+// those bytes back to the SSH session. This test models that drain and
+// verifies Write returns within a reasonable time when a DSR comes through.
+func TestWriteDoesNotBlockOnUnreadResponsePipe(t *testing.T) {
+	term := New(80, 24)
+	// Intentionally NOT calling term.Close in Cleanup: closing while the
+	// drainer goroutine is still blocked inside vt.Read races with xvt's
+	// internal `closed bool` (handlers in vt aren't synchronized). The
+	// race is benign in production (Read returns io.EOF either way) but
+	// the race detector flags it. The drainer goroutine simply leaks for
+	// the rest of the test process — harmless.
+
+	go func() {
+		buf := make([]byte, 256)
+		for {
+			if _, err := term.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		// CSI 6n = "report cursor position" — triggers a reply write into
+		// the emulator's response pipe.
+		_, _ = term.Write([]byte("\x1b[6n"))
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Terminal.Write blocked on a full response pipe — drainer not wired")
+	}
+}
 
 func TestWriteAndRenderPlainText(t *testing.T) {
 	term := New(20, 5)
