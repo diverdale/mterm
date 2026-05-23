@@ -103,8 +103,9 @@ func buildCommands(a *App) []command {
 
 // reloadHosts re-reads the config files and replaces the picker's host list.
 // Open tabs keep running on their existing SSH connections — only the picker
-// (and the next palette build) sees the change. Warnings from config.Load go
-// to a.statusMsg (last warning wins).
+// (and the next palette build) sees the change. A successful reload clears
+// any prior transient status message; warnings from config.Load then go to
+// a.statusMsg (last warning wins).
 func reloadHosts(a *App) {
 	res, err := config.Load()
 	if err != nil {
@@ -112,6 +113,7 @@ func reloadHosts(a *App) {
 		return
 	}
 	a.picker = newPicker(res.Hosts)
+	a.statusMsg = ""
 	for _, w := range res.Warnings {
 		a.statusMsg = w
 	}
