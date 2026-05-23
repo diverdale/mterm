@@ -31,14 +31,19 @@ When the active tab's host has a `BorderColor`:
 - Window frame: top border (incl. title bar fill), side bars, dividers (tab
   divider and footer divider), bottom border
 - Active tab chip: bracket characters and the label text
-- Footer's `user@host:port` segment (currently `sty.footerInfo`)
+- Footer's `user@host:port` segment (`sty.footerInfo`)
+- Footer key hints (`^B`, `^B n`, etc — `sty.footerKey`). Added after initial
+  release; the theme-accent default looked off against a tinted frame.
 
 What does *not* get re-tinted:
 
 - Inactive tab chips (stay dim)
 - The status glyph on every tab chip (keeps its own connected/failed/connecting
   semantic color)
-- Footer hint labels (e.g. `^B c · new`), footer hint keys, PREFIX badge, clock
+- Footer hint *labels* (`menu`, `next`, `close` — `sty.footerHint`) stay dim
+  for readability
+- PREFIX badge, clock — the badge is a transient input-mode signal, not host
+  chrome
 - Picker, palette, help, forwards modal overlays (host-agnostic)
 - The session body — remote terminal output is never modified
 

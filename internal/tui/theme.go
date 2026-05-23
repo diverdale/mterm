@@ -56,13 +56,17 @@ var active = Midnight
 var sty = buildStyles(active)
 
 // chromeStylesFor returns a styleSet identical to the active set, except that
-// the four host-tinted styles use c instead of the theme's Frame/Accent.
-// When c is "", returns the global sty unchanged so callers can use this
-// unconditionally.
+// the host-tinted styles use c instead of the theme's Frame/Accent. When c is
+// "", returns the global sty unchanged so callers can use this unconditionally.
 //
 // The override preserves every non-Foreground attribute of the base style
 // (Bold, Italic, etc.) by copying-then-replacing the foreground, so future
 // theme tweaks like adding Italic to title carry through automatically.
+//
+// footerKey is included so the ^B / ^B n / ^B x cues in the footer match the
+// frame color. footerHint (the "menu/next/close" labels) and prefixBadge are
+// deliberately not tinted — the labels stay dim for readability, and the
+// PREFIX badge is a transient input-mode signal, not host-related chrome.
 func chromeStylesFor(c string) styleSet {
 	if c == "" {
 		return sty
@@ -73,6 +77,7 @@ func chromeStylesFor(c string) styleSet {
 	s.title = sty.title.Foreground(col)
 	s.tabActive = sty.tabActive.Foreground(col)
 	s.footerInfo = sty.footerInfo.Foreground(col)
+	s.footerKey = sty.footerKey.Foreground(col)
 	return s
 }
 

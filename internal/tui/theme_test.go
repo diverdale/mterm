@@ -39,6 +39,9 @@ func TestChromeStylesForEmptyReturnsGlobal(t *testing.T) {
 	if s.footerInfo.GetForeground() != sty.footerInfo.GetForeground() {
 		t.Fatalf("footerInfo foreground differs from global")
 	}
+	if s.footerKey.GetForeground() != sty.footerKey.GetForeground() {
+		t.Fatalf("footerKey foreground differs from global")
+	}
 }
 
 func TestChromeStylesForOverridesHostTintedStyles(t *testing.T) {
@@ -49,6 +52,7 @@ func TestChromeStylesForOverridesHostTintedStyles(t *testing.T) {
 		"title":      s.title.GetForeground(),
 		"tabActive":  s.tabActive.GetForeground(),
 		"footerInfo": s.footerInfo.GetForeground(),
+		"footerKey":  s.footerKey.GetForeground(),
 	} {
 		if got != want {
 			t.Errorf("%s foreground = %v, want %v", name, got, want)
@@ -80,5 +84,13 @@ func TestChromeStylesForPreservesUntintedStyles(t *testing.T) {
 	}
 	if s.connected.GetForeground() != sty.connected.GetForeground() {
 		t.Errorf("connected foreground should not change")
+	}
+	// footerHint (the "menu/next/close" labels) and prefixBadge stay theme-default
+	// so they read consistently across hosts.
+	if s.footerHint.GetForeground() != sty.footerHint.GetForeground() {
+		t.Errorf("footerHint foreground should not change")
+	}
+	if s.prefixBadge.GetBackground() != sty.prefixBadge.GetBackground() {
+		t.Errorf("prefixBadge background should not change")
 	}
 }
