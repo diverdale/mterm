@@ -53,14 +53,15 @@ func (t *sessionTab) status() tabStatus {
 
 // sessionTab is one connection tab: an ssh.Session feeding a terminal emulator.
 type sessionTab struct {
-	id      int
-	host    config.Host
-	term    *terminal.Terminal
-	sess    atomic.Pointer[mssh.Session]      // nil until connected
-	logger  atomic.Pointer[sessionlog.Logger] // optional; nil = no logging
-	ended   atomic.Bool                       // set once the reader goroutine exits
-	w, h    int                               // full tab area including the tab bar
-	started time.Time                         // when this tab was opened
+	id       int
+	host     config.Host
+	term     *terminal.Terminal
+	sess     atomic.Pointer[mssh.Session]      // nil until connected
+	logger   atomic.Pointer[sessionlog.Logger] // optional; nil = no logging
+	snapshot atomic.Pointer[string]            // last rendered VT output for View()
+	ended    atomic.Bool                       // set once the reader goroutine exits
+	w, h     int                               // full tab area including the tab bar
+	started  time.Time                         // when this tab was opened
 }
 
 // newSessionTab creates a tab sized to the given total area.
@@ -85,10 +86,37 @@ func (t *sessionTab) title() string { return t.host.Name }
 // `exit`, the connection dropped, etc.).
 func (t *sessionTab) hasEnded() bool { return t.ended.Load() }
 
-// attach binds a connected ssh.Session and starts the reader goroutine.
+// attach binds a connected ssh.Session and starts the reader + snapshot
+// goroutines. The snapshot goroutine periodically renders the VT into a
+// string and stashes it in t.snapshot; View() reads that snapshot without
+// touching the live terminal mutex. This keeps bubbletea's event loop
+// responsive even when a remote TUI floods output — the event loop's
+// View call never blocks waiting for vt.Render to be free of vt.Write.
 func (t *sessionTab) attach(s *mssh.Session) {
 	t.sess.Store(s)
+	initial := t.term.Render()
+	t.snapshot.Store(&initial)
 	go t.readLoop()
+	go t.snapshotLoop()
+}
+
+// snapshotInterval bounds how often the snapshot goroutine refreshes the
+// rendered VT string. ~30 Hz matches the renderInterval tick; the user
+// sees frames at most one tick stale even under sustained heavy writes.
+const snapshotInterval = 33 * time.Millisecond
+
+// snapshotLoop refreshes the rendered VT string at snapshotInterval until
+// the session ends.
+func (t *sessionTab) snapshotLoop() {
+	ticker := time.NewTicker(snapshotInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		if t.ended.Load() {
+			return
+		}
+		rendered := t.term.Render()
+		t.snapshot.Store(&rendered)
+	}
 }
 
 // readLoop copies remote output into the emulator (and the session log, when
@@ -143,8 +171,15 @@ func (t *sessionTab) sendInput(p []byte) {
 	}
 }
 
-// View renders the tab body (the terminal screen).
+// View renders the tab body (the terminal screen). Reads the latest
+// snapshot from t.snapshot (atomic, no locking) so bubbletea's event
+// loop can always render without contending for the terminal mutex.
+// Falls back to a synchronous render only before the snapshot loop has
+// produced its first frame (e.g. in tests that never call attach).
 func (t *sessionTab) View() string {
+	if s := t.snapshot.Load(); s != nil {
+		return *s
+	}
 	return t.term.Render()
 }
 
