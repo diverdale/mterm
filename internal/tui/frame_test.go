@@ -15,7 +15,7 @@ func TestWindowHasExactGeometry(t *testing.T) {
 		footer: "footer here",
 		width:  80,
 		height: 24,
-	})
+	}, sty)
 	lines := strings.Split(out, "\n")
 	if len(lines) != 24 {
 		t.Fatalf("window has %d lines, want 24", len(lines))
@@ -34,7 +34,7 @@ func TestWindowShowsTitleAndFooter(t *testing.T) {
 		footer: "the-footer",
 		width:  60,
 		height: 12,
-	})
+	}, sty)
 	if !strings.Contains(out, "prod-web") {
 		t.Fatal("window must show the title")
 	}
@@ -51,7 +51,7 @@ func TestWindowWithTabStrip(t *testing.T) {
 		footer:   "f",
 		width:    60,
 		height:   12,
-	})
+	}, sty)
 	if !strings.Contains(out, "1 prod-web") {
 		t.Fatal("window must show the tab strip when provided")
 	}
@@ -63,7 +63,7 @@ func TestWindowWithTabStrip(t *testing.T) {
 func TestWindowMinHeightNoTab(t *testing.T) {
 	out := renderWindow(windowOpts{
 		title: "t", body: "b", footer: "f", width: 20, height: 4,
-	})
+	}, sty)
 	lines := strings.Split(out, "\n")
 	if len(lines) != 4 {
 		t.Fatalf("no-tab window at height 4 produced %d lines, want 4", len(lines))
@@ -78,7 +78,7 @@ func TestWindowMinHeightNoTab(t *testing.T) {
 func TestWindowShortWithTab(t *testing.T) {
 	out := renderWindow(windowOpts{
 		title: "t", tabStrip: "tabs", body: "b", footer: "f", width: 20, height: 6,
-	})
+	}, sty)
 	if got := len(strings.Split(out, "\n")); got != 6 {
 		t.Fatalf("with-tab window at height 6 produced %d lines, want 6", got)
 	}

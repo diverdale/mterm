@@ -368,7 +368,7 @@ func (a *App) pickerView() string {
 		hints: []keyHint{{"enter", "connect"}, {"type", "filter"}, {"esc", "back"}},
 		info:  fmt.Sprintf("%d hosts", len(a.picker.all)),
 		width: a.width - 2,
-	})
+	}, sty)
 	body := a.picker.View()
 	if a.statusMsg != "" {
 		body += "\n" + sty.errorText.Render("  "+a.statusMsg)
@@ -379,7 +379,7 @@ func (a *App) pickerView() string {
 		footer: footer,
 		width:  a.width,
 		height: a.height,
-	})
+	}, sty)
 }
 
 func (a *App) sessionView() string {
@@ -388,14 +388,14 @@ func (a *App) sessionView() string {
 		return a.pickerView()
 	}
 	title := sty.title.Render("mterm") + statusCount(len(a.tabs))
-	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2)
+	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2, sty)
 	footer := renderFooter(footerOpts{
 		hints:         []keyHint{{"^B", "menu"}, {"^B n", "next"}, {"^B x", "close"}},
 		info:          sessionInfo(t.host),
 		timer:         fmtUptime(t.uptime()),
 		prefixPending: a.prefixPending,
 		width:         a.width - 2,
-	})
+	}, sty)
 	return renderWindow(windowOpts{
 		title:    title,
 		tabStrip: tabs,
@@ -403,7 +403,7 @@ func (a *App) sessionView() string {
 		footer:   footer,
 		width:    a.width,
 		height:   a.height,
-	})
+	}, sty)
 }
 
 func (a *App) forwardsView() string {

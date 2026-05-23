@@ -13,7 +13,7 @@ func TestTabStripShowsAllTabs(t *testing.T) {
 		newSessionTab(1, config.Host{Name: "prod-web"}, 80, 24),
 		newSessionTab(2, config.Host{Name: "prod-db"}, 80, 24),
 	}
-	out := renderTabStrip(tabs, 0, 0, 80)
+	out := renderTabStrip(tabs, 0, 0, 80, sty)
 	if !strings.Contains(out, "prod-web") || !strings.Contains(out, "prod-db") {
 		t.Fatalf("tab strip missing a host name:\n%s", out)
 	}
@@ -24,13 +24,13 @@ func TestTabStripShowsAllTabs(t *testing.T) {
 
 func TestTabStripIsOneLine(t *testing.T) {
 	tabs := []*sessionTab{newSessionTab(1, config.Host{Name: "h"}, 80, 24)}
-	if strings.Contains(renderTabStrip(tabs, 0, 0, 80), "\n") {
+	if strings.Contains(renderTabStrip(tabs, 0, 0, 80, sty), "\n") {
 		t.Fatal("tab strip must be a single line")
 	}
 }
 
 func TestTabStripEmptyTabs(t *testing.T) {
-	if got := renderTabStrip(nil, 0, 0, 80); strings.Contains(got, "\n") {
+	if got := renderTabStrip(nil, 0, 0, 80, sty); strings.Contains(got, "\n") {
 		t.Fatal("empty tab strip must still be a single line")
 	}
 }
@@ -40,7 +40,7 @@ func TestTabStripTruncatesOverflow(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		tabs = append(tabs, newSessionTab(i+1, config.Host{Name: "longhostname-prod"}, 80, 24))
 	}
-	out := renderTabStrip(tabs, 0, 0, 40)
+	out := renderTabStrip(tabs, 0, 0, 40, sty)
 	if strings.Contains(out, "\n") {
 		t.Fatalf("an overflowing tab strip must stay a single line, got:\n%s", out)
 	}
@@ -51,7 +51,7 @@ func TestTabStripTruncatesOverflow(t *testing.T) {
 
 func TestTabStripStylesTabs(t *testing.T) {
 	tabs := []*sessionTab{newSessionTab(1, config.Host{Name: "h"}, 80, 24)}
-	out := renderTabStrip(tabs, 0, 0, 80)
+	out := renderTabStrip(tabs, 0, 0, 80, sty)
 	if !strings.Contains(out, "\x1b[") {
 		t.Fatalf("tab strip must be styled (ANSI escape codes), got: %q", out)
 	}
@@ -62,7 +62,7 @@ func TestTabStripActiveTabBracketed(t *testing.T) {
 		newSessionTab(1, config.Host{Name: "alpha"}, 80, 24),
 		newSessionTab(2, config.Host{Name: "beta"}, 80, 24),
 	}
-	out := renderTabStrip(tabs, 0, 0, 80)
+	out := renderTabStrip(tabs, 0, 0, 80, sty)
 	// The active tab is outlined with brackets.
 	if !strings.Contains(out, "[ ") || !strings.Contains(out, " ]") {
 		t.Fatalf("active tab should be bracketed, got:\n%s", out)

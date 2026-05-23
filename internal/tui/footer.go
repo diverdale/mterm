@@ -25,16 +25,16 @@ type footerOpts struct {
 // renderFooter renders the one-line footer. Hints sit on the left, info and
 // clock on the right. On a narrow width the right side is dropped before the
 // left. The result has no newline and is exactly width wide.
-func renderFooter(o footerOpts) string {
+func renderFooter(o footerOpts, s styleSet) string {
 	var left string
 	if o.prefixPending {
-		left = sty.prefixBadge.Render("PREFIX")
+		left = s.prefixBadge.Render("PREFIX")
 	} else {
 		parts := make([]string, 0, len(o.hints))
 		for _, h := range o.hints {
-			parts = append(parts, sty.footerKey.Render(h.key)+" "+sty.footerHint.Render(h.label))
+			parts = append(parts, s.footerKey.Render(h.key)+" "+s.footerHint.Render(h.label))
 		}
-		left = strings.Join(parts, sty.footerHint.Render("  ·  "))
+		left = strings.Join(parts, s.footerHint.Render("  ·  "))
 	}
 
 	right := o.info
@@ -44,7 +44,7 @@ func renderFooter(o footerOpts) string {
 		}
 		right += o.timer
 	}
-	right = sty.footerInfo.Render(right)
+	right = s.footerInfo.Render(right)
 
 	leftW := lipgloss.Width(left)
 	rightW := lipgloss.Width(right)

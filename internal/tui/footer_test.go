@@ -14,7 +14,7 @@ func TestFooterShowsHintsAndInfo(t *testing.T) {
 		hints: sessionHints(),
 		info:  "dale@host:22",
 		width: 80,
-	})
+	}, sty)
 	if strings.Contains(out, "\n") {
 		t.Fatal("footer must be a single line")
 	}
@@ -31,7 +31,7 @@ func TestFooterPrefixBadge(t *testing.T) {
 		hints:         sessionHints(),
 		prefixPending: true,
 		width:         80,
-	})
+	}, sty)
 	if !strings.Contains(out, "PREFIX") {
 		t.Fatalf("prefix-pending footer must show the PREFIX badge:\n%s", out)
 	}
@@ -43,7 +43,7 @@ func TestFooterDropsInfoWhenNarrow(t *testing.T) {
 		hints: sessionHints(),
 		info:  "dale@averylonghostname.example.com:22",
 		width: 24,
-	})
+	}, sty)
 	if strings.Contains(out, "\n") {
 		t.Fatal("narrow footer must still be one line")
 	}
