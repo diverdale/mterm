@@ -87,7 +87,7 @@ All fields are optional unless noted. Field names are **lowercase** by conventio
 | `address`     | string    | `name`        | IP or DNS-resolvable hostname to dial. If omitted, mterm dials `name` directly via DNS. |
 | `user`        | string    | current user  | SSH username. |
 | `port`        | int       | `22`          | SSH port. |
-| `group`       | string    | (none)        | Picker group label. Hosts are sorted by group then name. |
+| `group`       | string    | (none)        | Picker group label. Slash-delimited paths nest sub-groups (`Home/Media`, `Work/Project1`). Hosts sort lexically by full path, then name. |
 | `tags`        | []string  | (none)        | Tag list shown in `[…]` brackets next to the host in the picker. |
 | `forwards`    | []Forward | (none)        | Port-forwarding rules. See below. |
 | `bordercolor` | string    | (theme accent)| Hex `#RRGGBB` or `#RGB`. When this host's tab is active, the window frame, active tab chip, footer key hints, and `user@host:port` segment all use this color. Invalid values warn and are ignored. |
@@ -141,6 +141,18 @@ hosts:
   - name: log-firehose
     address: 10.0.0.8
     log: false
+
+  # Nested groups: slash-delimited paths render as indented sub-groups in
+  # the picker. Mix-and-match flat and nested groups freely.
+  - name: plex
+    address: 192.168.2.50
+    group: Home/Media
+  - name: sys-dev
+    address: 192.168.2.20
+    group: Home/Development
+  - name: project1-box1
+    address: 10.0.1.1
+    group: Work/Project1
 ```
 
 ## ssh_config interaction

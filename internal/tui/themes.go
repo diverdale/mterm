@@ -7,7 +7,7 @@ var Matrix = Theme{
 	Name:      "matrix",
 	Accent:    lipgloss.Color("#00FF41"),
 	Frame:     lipgloss.Color("#1A1A1A"),
-	Dim:       lipgloss.Color("#3A3A3A"),
+	Dim:       lipgloss.Color("#6B7280"),
 	Text:      lipgloss.Color("#00CC33"),
 	Warning:   lipgloss.Color("#FFB347"),
 	Error:     lipgloss.Color("#FF4747"),

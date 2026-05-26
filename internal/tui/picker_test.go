@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -8,6 +10,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"mterm/internal/config"
 )
+
+// ansiRE strips every CSI escape (SGR colors, attributes, etc.) so tests can
+// assert on visible text without coupling to lipgloss's specific ANSI output.
+var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 func sampleHosts() []config.Host {
 	return []config.Host{
@@ -186,5 +192,109 @@ func TestPickerGroupHeaderHasBlankLineBetweenGroups(t *testing.T) {
 	// Verify the line immediately preceding the LAB header is blank.
 	if strings.TrimSpace(lines[labIdx-1]) != "" {
 		t.Fatalf("line before LAB header is not blank: %q", lines[labIdx-1])
+	}
+}
+
+func TestPathSegmentsCleansPath(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+	}{
+		{"", nil},
+		{"Home", []string{"Home"}},
+		{"Home/Media", []string{"Home", "Media"}},
+		{"/Home/Media/", []string{"Home", "Media"}},
+		{"Home//Media", []string{"Home", "Media"}},
+		{"  Home  /  Media  ", []string{"Home", "Media"}},
+		{"a/b/c/d", []string{"a", "b", "c", "d"}},
+	}
+	for _, tc := range cases {
+		got := pathSegments(tc.in)
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("pathSegments(%q) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestCommonPrefixLen(t *testing.T) {
+	cases := []struct {
+		a, b []string
+		want int
+	}{
+		{nil, nil, 0},
+		{[]string{"x"}, nil, 0},
+		{[]string{"Home"}, []string{"Home"}, 1},
+		{[]string{"Home", "Media"}, []string{"Home", "Dev"}, 1},
+		{[]string{"Home", "Media"}, []string{"Home", "Media"}, 2},
+		{[]string{"Home", "Media"}, []string{"Work", "Media"}, 0},
+		{[]string{"A", "B", "C"}, []string{"A", "B"}, 2},
+	}
+	for _, tc := range cases {
+		if got := commonPrefixLen(tc.a, tc.b); got != tc.want {
+			t.Errorf("commonPrefixLen(%v, %v) = %d, want %d", tc.a, tc.b, got, tc.want)
+		}
+	}
+}
+
+func TestPickerNestedGroupsRenderHierarchy(t *testing.T) {
+	hosts := []config.Host{
+		{Name: "binarr", HostName: "192.168.2.12", Group: "Home/Media"},
+		{Name: "plex", HostName: "192.168.2.50", Group: "Home/Media"},
+		{Name: "sys-dev", HostName: "192.168.2.20", Group: "Home/Development"},
+		{Name: "box1", HostName: "10.0.1.1", Group: "Work/Project1"},
+	}
+	p := newPicker(hosts)
+	p.setSize(80, 24)
+	out := p.View()
+
+	// All four expected headers must appear.
+	for _, want := range []string{"▸ HOME", "▸ MEDIA", "▸ DEVELOPMENT", "▸ WORK", "▸ PROJECT1"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("output missing header %q in:\n%s", want, out)
+		}
+	}
+
+	// Sub-group headers must be indented (2 spaces per depth level).
+	for _, want := range []string{"  ▸ MEDIA", "  ▸ DEVELOPMENT", "  ▸ PROJECT1"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("output missing indented header %q in:\n%s", want, out)
+		}
+	}
+}
+
+func TestPickerSiblingsShareSingleParentHeader(t *testing.T) {
+	// Home/Media and Home/Development should produce ONE "▸ HOME" header,
+	// then both sub-group headers under it.
+	hosts := []config.Host{
+		{Name: "a", Group: "Home/Media"},
+		{Name: "b", Group: "Home/Development"},
+	}
+	p := newPicker(hosts)
+	p.setSize(80, 24)
+	out := p.View()
+	if got := strings.Count(out, "▸ HOME"); got != 1 {
+		t.Fatalf("expected exactly one HOME header, got %d in:\n%s", got, out)
+	}
+}
+
+func TestPickerNestedHostRowIndented(t *testing.T) {
+	// Two hosts at the same depth so we can check the cursor and a
+	// non-cursor row separately.
+	hosts := []config.Host{
+		{Name: "alpha", HostName: "1.1.1.1", Group: "Home/Media"},
+		{Name: "beta", HostName: "2.2.2.2", Group: "Home/Media"},
+	}
+	p := newPicker(hosts)
+	p.setSize(80, 24)
+	out := p.View()
+	stripped := ansiRE.ReplaceAllString(out, "")
+
+	// Depth 2 → 2*2 = 4 spaces of indent, then "> " for the cursor row or
+	// "  " for non-cursor rows.
+	if !strings.Contains(stripped, "    > alpha") {
+		t.Fatalf("cursor row at depth 2 should start with %q; stripped:\n%s", "    > alpha", stripped)
+	}
+	if !strings.Contains(stripped, "      beta") {
+		t.Fatalf("non-cursor row at depth 2 should have 6 leading spaces; stripped:\n%s", stripped)
 	}
 }
