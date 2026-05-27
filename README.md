@@ -327,6 +327,41 @@ To inspect what identities are available:
 security find-identity -v -p codesigning
 ```
 
+### macOS .pkg installer
+
+For a one-click install experience, `installer.sh` fuses the two darwin
+binaries into a universal binary, wraps it in a signed + notarized .pkg
+that drops `mterm` into `/usr/local/bin/`, and staples the notarization
+ticket. Colleagues double-click the .pkg, enter their password, then run
+`mterm` from any terminal afterward.
+
+Requires a Developer ID **Installer** certificate (different from the
+Application cert used above — Apple issues them separately):
+
+```bash
+# See your installer identities:
+security find-identity -v -p basic | grep "Developer ID Installer"
+
+# Then build + sign + notarize the installer:
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+export APPLE_INSTALLER_SIGNING_IDENTITY="Developer ID Installer: Your Name (TEAMID)"
+export APPLE_KEYCHAIN_PROFILE="mterm-notary"
+./build.sh && ./installer.sh
+```
+
+Output: `dist/mterm-installer.pkg` (~12 MiB; universal binary inside).
+
+Override defaults via:
+- `PKG_IDENTIFIER` (default `dev.mterm`) — reverse-DNS bundle id
+- `PKG_VERSION`  (default derived from `git describe`) — installer version
+
+Uninstall (for colleagues if asked):
+
+```bash
+sudo rm /usr/local/bin/mterm
+pkgutil --forget dev.mterm
+```
+
 ## License
 
 TBD.
