@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"sync"
@@ -226,3 +227,38 @@ func TestCursorDoesNotCorruptWideChar(t *testing.T) {
 		t.Fatalf("Render() corrupted the wide char: %q", r2)
 	}
 }
+
+func TestRenderAtZeroIsLive(t *testing.T) {
+	// offset=0 must produce the same output as Render() so the snapshot
+	// path is identical when the user hasn't scrolled.
+	term := New(20, 3)
+	term.Write([]byte("hello"))
+	live := term.Render()
+	if got := term.RenderAt(0); got != live {
+		t.Fatalf("RenderAt(0) diverges from Render():\nlive: %q\nat0:  %q", live, got)
+	}
+}
+
+func TestRenderAtShowsScrollback(t *testing.T) {
+	// Push more lines than the terminal height so the older ones land in
+	// scrollback, then verify RenderAt brings them back into view.
+	term := New(40, 3)
+	for i := 0; i < 10; i++ {
+		// Each line: "line-N\r\n" — \r\n flushes a row to scrollback.
+		fmt.Fprintf(testWriter{term}, "line-%d\r\n", i)
+	}
+	if got := term.ScrollbackLen(); got < 5 {
+		t.Fatalf("expected at least 5 lines in scrollback; got %d", got)
+	}
+	// At offset 5, the top of the view should include the first lines
+	// that got pushed off the live screen.
+	at5 := term.RenderAt(5)
+	if !strings.Contains(at5, "line-3") {
+		t.Fatalf("RenderAt(5) should surface older content (looking for 'line-3'); got:\n%s", at5)
+	}
+}
+
+// testWriter adapts *Terminal to io.Writer so fmt.Fprintf works inline.
+type testWriter struct{ t *Terminal }
+
+func (w testWriter) Write(p []byte) (int, error) { return w.t.Write(p) }

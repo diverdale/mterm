@@ -25,6 +25,10 @@ XL ≈ structural change to the app, multiple branches.
 - Broadcast input — `^B s` toggles the active tab into a sync set; every
   keystroke in any sync-set tab fans out to the rest. Warning-color asterisk
   in the tab chip + `[sync N]` count in the window title.
+- Mouse-wheel scrollback on the active session tab; any keystroke snaps the
+  view back to live. Auto-anchored: the user's viewport stays glued to the
+  same content as new output pushes scrollback further up. Title gains a
+  warning-color `[scroll N]` indicator when not at live.
 - Command palette (`^B :`) and help overlay (`^B ?`)
 - Port-forwarding plumbing (panel exists; integration deferred)
 - Per-tab session timer, animated status spinner

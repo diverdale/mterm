@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -125,6 +126,61 @@ func (t *Terminal) Render() string {
 	// Fix 2: use defer so the restore runs even if t.vt.Render() panics.
 	defer t.vt.SetCell(cx, cy, saved)
 	return t.vt.Render()
+}
+
+// ScrollbackLen returns the number of lines currently held in the
+// scrollback buffer. 0 when no output has scrolled off the top.
+func (t *Terminal) ScrollbackLen() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.vt.ScrollbackLen()
+}
+
+// RenderAt composes a view with the given scrollback offset (0 = live view
+// matching Render(); positive = that many lines back from the bottom). The
+// result is exactly t.h lines high. For offsets greater than ScrollbackLen
+// the view clamps to showing the entire scrollback at the top with live
+// rows below.
+//
+// Cursor injection is skipped when offset > 0 — a cursor in the middle of
+// historical content is misleading.
+func (t *Terminal) RenderAt(offset int) string {
+	if offset <= 0 {
+		return t.Render()
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	sb := t.vt.Scrollback()
+	sbLen := sb.Len()
+	if offset > sbLen {
+		offset = sbLen
+	}
+
+	rows := make([]string, 0, t.h)
+	// Most recent `offset` scrollback lines slide up into view.
+	for i := sbLen - offset; i < sbLen; i++ {
+		ln := sb.Line(i)
+		if ln == nil {
+			rows = append(rows, "")
+			continue
+		}
+		rows = append(rows, ln.Render())
+	}
+	// Fill the remainder with top rows of the live screen.
+	if len(rows) < t.h {
+		live := strings.Split(t.vt.Render(), "\n")
+		need := t.h - len(rows)
+		for i := 0; i < need && i < len(live); i++ {
+			rows = append(rows, live[i])
+		}
+	}
+	// Cap (defensive — shouldn't happen unless scrollback line count
+	// arithmetic drifts).
+	if len(rows) > t.h {
+		rows = rows[:t.h]
+	}
+	return strings.Join(rows, "\n")
 }
 
 // CursorPosition returns the 0-indexed cursor column and row.

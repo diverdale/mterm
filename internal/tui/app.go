@@ -143,6 +143,9 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 	case tea.KeyMsg:
 		return a.handleKey(m)
 
+	case tea.MouseMsg:
+		return a.handleMouse(m)
+
 	case pickerChosenMsg:
 		return a.openTab(m.host)
 
@@ -219,6 +222,10 @@ func (a *App) handleKey(k tea.KeyMsg) tea.Cmd {
 		if t == nil {
 			return nil
 		}
+		// Typing snaps the view back to live so output from the remote
+		// doesn't keep landing invisibly below the user's frozen
+		// scrollback view.
+		t.snapToLive()
 		bytes := keyToBytes(k)
 		t.sendInput(bytes)
 		// If the active tab is in the broadcast set, fan the same bytes
@@ -280,6 +287,32 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 		if idx < len(a.tabs) {
 			a.active = idx
 		}
+	}
+	return nil
+}
+
+// wheelStep is how many lines a single wheel-tick scrolls the view. Matches
+// the typical "3 lines per notch" terminal convention so the feel is close
+// to scrolling outside mterm.
+const wheelStep = 3
+
+// handleMouse routes mouse events. Today only wheel-up / wheel-down do
+// anything — they scroll the active session tab's scrollback offset.
+// Clicks and motion are ignored; if a future feature wants them (e.g.
+// mouse passthrough to remote vim) it'll plug in here.
+func (a *App) handleMouse(m tea.MouseMsg) tea.Cmd {
+	if a.mode != modeSession {
+		return nil
+	}
+	t := a.activeTab()
+	if t == nil {
+		return nil
+	}
+	switch m.Button {
+	case tea.MouseButtonWheelUp:
+		t.scrollBy(wheelStep)
+	case tea.MouseButtonWheelDown:
+		t.scrollBy(-wheelStep)
 	}
 	return nil
 }
@@ -495,7 +528,8 @@ func (a *App) sessionView() string {
 		return a.pickerView()
 	}
 	s := chromeStylesFor(t.host.BorderColor)
-	title := s.title.Render(appmeta.Name) + statusCount(len(a.tabs)) + syncCount(len(a.syncTabs))
+	off, _ := t.scrollPos()
+	title := s.title.Render(appmeta.Name) + statusCount(len(a.tabs)) + syncCount(len(a.syncTabs)) + scrollIndicator(off)
 	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2, s, a.syncTabs)
 	footer := renderFooter(footerOpts{
 		hints:         []keyHint{{"^B", "menu"}, {"^B n", "next"}, {"^B x", "close"}},
@@ -536,6 +570,17 @@ func syncCount(n int) string {
 	}
 	return lipgloss.NewStyle().Foreground(active.Warning).Bold(true).
 		Render(fmt.Sprintf("  [sync %d]", n))
+}
+
+// scrollIndicator renders a " [scroll N]" suffix when the user is looking
+// back into scrollback so it's obvious the view is frozen. Hidden when at
+// live (offset 0). Uses the warning color to discourage stale-view confusion.
+func scrollIndicator(offset int) string {
+	if offset <= 0 {
+		return ""
+	}
+	return lipgloss.NewStyle().Foreground(active.Warning).Bold(true).
+		Render(fmt.Sprintf("  [scroll %d]", offset))
 }
 
 // sessionInfo renders user@host:port for the footer.

@@ -528,6 +528,56 @@ func TestSyncCountSuffixShowsOnlyWhenNonEmpty(t *testing.T) {
 	}
 }
 
+func TestAppMouseWheelScrollsActiveTab(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	// Push enough output into scrollback that the offset has room to grow.
+	tab := app.tabs[0]
+	for i := 0; i < 50; i++ {
+		tab.term.Write([]byte("line\r\n"))
+	}
+
+	// Wheel up moves the offset up.
+	app.update(tea.MouseMsg{Button: tea.MouseButtonWheelUp, Action: tea.MouseActionPress})
+	if off, _ := tab.scrollPos(); off <= 0 {
+		t.Fatalf("wheel up should have raised scrollOffset; got %d", off)
+	}
+
+	// Wheel down brings it back toward live.
+	for i := 0; i < 10; i++ {
+		app.update(tea.MouseMsg{Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
+	}
+	if off, _ := tab.scrollPos(); off != 0 {
+		t.Fatalf("repeated wheel down should clamp offset to 0; got %d", off)
+	}
+}
+
+func TestAppSessionKeystrokeSnapsScrollbackToLive(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	tab := app.tabs[0]
+	for i := 0; i < 50; i++ {
+		tab.term.Write([]byte("line\r\n"))
+	}
+	// Scroll back into history.
+	tab.scrollBy(15)
+	if off, _ := tab.scrollPos(); off == 0 {
+		t.Fatalf("setup: scroll did not advance offset")
+	}
+	// Any plain keystroke in session mode must snap to live so the user's
+	// typing doesn't disappear under a frozen scrollback view.
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	if off, _ := tab.scrollPos(); off != 0 {
+		t.Fatalf("keystroke should snap offset to 0; got %d", off)
+	}
+}
+
 func TestAppCtrlCPassesThroughToSession(t *testing.T) {
 	// Ctrl-C is the universal "interrupt remote process" signal — mterm
 	// must NOT intercept it. Quit is on the deliberate ^B q two-step.

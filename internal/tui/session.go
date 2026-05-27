@@ -64,6 +64,14 @@ type sessionTab struct {
 	ended    atomic.Bool                       // set once the reader goroutine exits
 	w, h     int                               // full tab area including the tab bar
 	started  time.Time                         // when this tab was opened
+
+	// Scrollback view offset (lines back from the live bottom). 0 = live
+	// view; positive = looking at history. scrollbackLenSeen lets the
+	// snapshot worker auto-bump offset when new lines push existing
+	// scrollback further up — so the user's view stays anchored to the
+	// SAME content as the remote keeps producing output.
+	scrollOffset      atomic.Int32
+	scrollbackLenSeen atomic.Int32
 }
 
 // newSessionTab creates a tab sized to the given total area.
@@ -147,13 +155,28 @@ func (t *sessionTab) snapshotLoop() {
 // Render leaves the existing snapshot in place (so the user sees the last
 // good frame) and prints a one-line diagnostic to stderr; the next tick
 // tries again.
+//
+// When the user is scrolled into history (scrollOffset > 0), the snapshot
+// uses RenderAt to compose scrollback + live. The auto-anchor logic bumps
+// scrollOffset by however many new lines have been pushed into scrollback
+// since the last snapshot, so the user's viewport stays glued to the same
+// content rather than appearing to scroll on its own.
 func (t *sessionTab) takeSnapshot() {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "mterm: snapshot panic for tab %d (%s): %v\n", t.id, t.host.Name, r)
 		}
 	}()
-	rendered := t.term.Render()
+	sbLen := int32(t.term.ScrollbackLen())
+	prev := t.scrollbackLenSeen.Swap(sbLen)
+	if off := t.scrollOffset.Load(); off > 0 && sbLen > prev {
+		newOff := off + (sbLen - prev)
+		if newOff > sbLen {
+			newOff = sbLen
+		}
+		t.scrollOffset.Store(newOff)
+	}
+	rendered := t.term.RenderAt(int(t.scrollOffset.Load()))
 	t.snapshot.Store(&rendered)
 }
 
@@ -248,6 +271,33 @@ func (t *sessionTab) logPath() string {
 		return l.Path()
 	}
 	return ""
+}
+
+// scrollBy adjusts the scrollback offset by delta. Positive scrolls up
+// into history; negative scrolls back toward the live view. Clamps so
+// the offset can never exceed the available scrollback or fall below 0.
+func (t *sessionTab) scrollBy(delta int) {
+	cur := t.scrollOffset.Load()
+	next := cur + int32(delta)
+	if next < 0 {
+		next = 0
+	}
+	if max := int32(t.term.ScrollbackLen()); next > max {
+		next = max
+	}
+	t.scrollOffset.Store(next)
+}
+
+// snapToLive returns the view to the bottom of the live screen (no offset).
+// Called on any keystroke routed to the remote so typing after scrolling
+// back doesn't leave the user looking at stale content while output streams
+// invisibly below.
+func (t *sessionTab) snapToLive() { t.scrollOffset.Store(0) }
+
+// scrollPos returns the current offset and total scrollback length, for
+// chrome rendering ("scroll 42/200" style indicators).
+func (t *sessionTab) scrollPos() (offset, total int) {
+	return int(t.scrollOffset.Load()), t.term.ScrollbackLen()
 }
 
 // h2body converts a full tab area (w, h) into the inner terminal body size,

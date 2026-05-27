@@ -103,7 +103,7 @@ func run() error {
 			fmt.Fprintln(os.Stderr, appmeta.Name+": warning: history load:", err)
 		}
 	}
-	p := tea.NewProgram(app, tea.WithAltScreen())
+	p := tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = p.Run()
 	return err
 }

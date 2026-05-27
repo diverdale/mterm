@@ -26,7 +26,10 @@ The `~/.config/mterm/` directory is created automatically on first run.
 
 - Tabbed SSH sessions with `^B` prefix navigation (tmux-style)
 - Native Go SSH client + agent auth + lenient `known_hosts`
-- Full-fidelity VT terminal: cursor, 24-bit color, scrollback, copy mode
+- Full-fidelity VT terminal: cursor, 24-bit color
+- Mouse-wheel scrollback on the active session — scroll up to browse
+  history, type any key to snap back to live. Viewport stays anchored to
+  the same content as new output streams in
 - Auto-reconnect on transport failure
 - Fuzzy host picker reading `~/.ssh/config` + `~/.config/mterm/hosts.yaml`
   with per-host connection state — `◉` currently in a tab, `●` previously
