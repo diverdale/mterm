@@ -157,7 +157,18 @@ hosts:
 	}
 }
 
-func TestMergeSortedByGroupThenName(t *testing.T) {
+func TestMergeRespectsYAMLOrder(t *testing.T) {
+	// Sort is hierarchical by intentOrder: groups appear in the order their
+	// first host appeared, and hosts inside a group appear in yaml order.
+	// Alphabetical sort within a group is gone — explicit user intent wins.
+	//
+	// File order:
+	//   zeta (group: alpha)  → intentOrder 0 → prefixMin[alpha] = 0
+	//   alpha (group: beta)  → intentOrder 1 → prefixMin[beta]  = 1
+	//   beta (group: alpha)  → intentOrder 2 (alpha already min 0)
+	//
+	// Sort: group alpha (0) before group beta (1); within alpha, zeta
+	// before beta (yaml order, NOT alphabetical).
 	sshPath := writeTemp(t, "config", "")
 	mtermPath := writeTemp(t, "hosts.yaml", `
 hosts:
@@ -169,15 +180,13 @@ hosts:
 	if err != nil {
 		t.Fatal(err)
 	}
-	order := []string{}
+	got := []string{}
 	for _, h := range res.Hosts {
-		order = append(order, h.Name)
+		got = append(got, h.Name)
 	}
-	want := []string{"beta", "zeta", "alpha"} // group alpha first, then name
-	for i := range want {
-		if order[i] != want[i] {
-			t.Fatalf("sort order = %v, want %v", order, want)
-		}
+	want := []string{"zeta", "beta", "alpha"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("sort order = %v, want %v", got, want)
 	}
 }
 
@@ -362,6 +371,139 @@ func TestLoadAndMergeLogTriState(t *testing.T) {
 		if want[h.Name] != h.Logging() {
 			t.Errorf("host %q Logging() = %v, want %v", h.Name, h.Logging(), want[h.Name])
 		}
+	}
+}
+
+func TestLoadAndMergeNestedGroupsSchema(t *testing.T) {
+	// Structured nested groups: yaml hierarchy becomes the slash-delimited
+	// Group field, and yaml order is preserved in the result.
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`groups:
+  - name: Work
+    groups:
+      - name: Lab
+        hosts:
+          - name: sao-dev
+            address: 10.122.26.36
+            user: dale
+      - name: MSFT
+        hosts:
+          - name: msft-optical-1
+            address: 10.122.161.81
+            user: administrator
+  - name: Home
+    groups:
+      - name: Media
+        hosts:
+          - name: plex
+            address: 192.168.2.50
+          - name: binarr
+            address: 192.168.2.12
+      - name: Development
+        hosts:
+          - name: sys-dev
+            address: 192.168.2.20
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", res.Warnings)
+	}
+
+	// Verify each host has the correct slash-delimited Group derived from
+	// its position in the tree.
+	want := map[string]string{
+		"sao-dev":        "Work/Lab",
+		"msft-optical-1": "Work/MSFT",
+		"plex":           "Home/Media",
+		"binarr":         "Home/Media",
+		"sys-dev":        "Home/Development",
+	}
+	got := map[string]string{}
+	for _, h := range res.Hosts {
+		got[h.Name] = h.Group
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Group paths = %v, want %v", got, want)
+	}
+
+	// Verify yaml order is preserved: Work block first (Lab before MSFT),
+	// then Home block (Media before Development; plex before binarr).
+	names := []string{}
+	for _, h := range res.Hosts {
+		names = append(names, h.Name)
+	}
+	wantOrder := []string{"sao-dev", "msft-optical-1", "plex", "binarr", "sys-dev"}
+	if !reflect.DeepEqual(names, wantOrder) {
+		t.Fatalf("order = %v, want %v", names, wantOrder)
+	}
+}
+
+func TestLoadAndMergeMixedFlatAndNestedSchema(t *testing.T) {
+	// Flat `hosts:` entries with slash-delimited groups must coexist with
+	// the structured `groups:` form. Hosts of the same group from both
+	// sources land in the same picker section.
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`groups:
+  - name: Home
+    groups:
+      - name: Media
+        hosts:
+          - name: plex
+            address: 1.1.1.1
+hosts:
+  - name: binarr
+    address: 2.2.2.2
+    group: Home/Media
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hosts) != 2 {
+		t.Fatalf("hosts = %d, want 2", len(res.Hosts))
+	}
+	// Both should share group "Home/Media" and be adjacent.
+	if res.Hosts[0].Group != "Home/Media" || res.Hosts[1].Group != "Home/Media" {
+		t.Fatalf("expected both hosts in Home/Media, got %+v", res.Hosts)
+	}
+	// plex was declared first (nested) → comes before binarr (flat).
+	if res.Hosts[0].Name != "plex" || res.Hosts[1].Name != "binarr" {
+		t.Fatalf("order = %s,%s; want plex,binarr", res.Hosts[0].Name, res.Hosts[1].Name)
+	}
+}
+
+func TestLoadAndMergeSSHConfigHostsTrailYAMLDeclared(t *testing.T) {
+	// ssh_config hosts with no yaml counterpart must sort after all
+	// yaml-declared hosts so the user's explicit organization wins.
+	sshPath := writeTemp(t, "config", `
+Host ssh-only-host
+    HostName ssh-only-host
+`)
+	mtermPath := writeTemp(t, "hosts.yaml", `
+hosts:
+  - name: yaml-host
+    address: 1.1.1.1
+    group: Work
+`)
+	res, err := loadAndMerge(sshPath, mtermPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := []string{}
+	for _, h := range res.Hosts {
+		names = append(names, h.Name)
+	}
+	if !reflect.DeepEqual(names, []string{"yaml-host", "ssh-only-host"}) {
+		t.Fatalf("order = %v, want [yaml-host ssh-only-host]", names)
 	}
 }
 

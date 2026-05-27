@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -192,47 +191,6 @@ func TestPickerGroupHeaderHasBlankLineBetweenGroups(t *testing.T) {
 	// Verify the line immediately preceding the LAB header is blank.
 	if strings.TrimSpace(lines[labIdx-1]) != "" {
 		t.Fatalf("line before LAB header is not blank: %q", lines[labIdx-1])
-	}
-}
-
-func TestPathSegmentsCleansPath(t *testing.T) {
-	cases := []struct {
-		in   string
-		want []string
-	}{
-		{"", nil},
-		{"Home", []string{"Home"}},
-		{"Home/Media", []string{"Home", "Media"}},
-		{"/Home/Media/", []string{"Home", "Media"}},
-		{"Home//Media", []string{"Home", "Media"}},
-		{"  Home  /  Media  ", []string{"Home", "Media"}},
-		{"a/b/c/d", []string{"a", "b", "c", "d"}},
-	}
-	for _, tc := range cases {
-		got := pathSegments(tc.in)
-		if !reflect.DeepEqual(got, tc.want) {
-			t.Errorf("pathSegments(%q) = %v, want %v", tc.in, got, tc.want)
-		}
-	}
-}
-
-func TestCommonPrefixLen(t *testing.T) {
-	cases := []struct {
-		a, b []string
-		want int
-	}{
-		{nil, nil, 0},
-		{[]string{"x"}, nil, 0},
-		{[]string{"Home"}, []string{"Home"}, 1},
-		{[]string{"Home", "Media"}, []string{"Home", "Dev"}, 1},
-		{[]string{"Home", "Media"}, []string{"Home", "Media"}, 2},
-		{[]string{"Home", "Media"}, []string{"Work", "Media"}, 0},
-		{[]string{"A", "B", "C"}, []string{"A", "B"}, 2},
-	}
-	for _, tc := range cases {
-		if got := commonPrefixLen(tc.a, tc.b); got != tc.want {
-			t.Errorf("commonPrefixLen(%v, %v) = %d, want %d", tc.a, tc.b, got, tc.want)
-		}
 	}
 }
 

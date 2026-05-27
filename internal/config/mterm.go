@@ -9,7 +9,25 @@ import (
 )
 
 type mtermFile struct {
+	// Hosts is the flat list — overlays for ssh_config aliases or hosts
+	// the user doesn't want to nest. Each entry's `group:` field can be a
+	// slash-delimited path (e.g. "Home/Media") to land it under a nested
+	// group from the structured form.
 	Hosts []mtermHost `yaml:"hosts"`
+
+	// Groups is the structured/nested form — hierarchy is yaml structure,
+	// and order in the file is order in the picker.
+	Groups []mtermGroup `yaml:"groups"`
+}
+
+// mtermGroup is one node in the nested group tree. A group has a name,
+// optionally more nested groups, and optionally hosts directly under it.
+// Recurses arbitrarily deep. The walker (collectNestedHosts) flattens this
+// tree into mtermHost records with their full slash path set.
+type mtermGroup struct {
+	Name   string       `yaml:"name"`
+	Groups []mtermGroup `yaml:"groups"`
+	Hosts  []mtermHost  `yaml:"hosts"`
 }
 
 // mtermHost is the on-disk yaml form. All tags are lowercase to match yaml
@@ -33,6 +51,11 @@ type mtermHost struct {
 	Forwards    []mtermForward `yaml:"forwards"`
 	BorderColor string         `yaml:"bordercolor"`
 	Log         *bool          `yaml:"log"` // nil = default-on; false = opt-out
+
+	// intentOrder is the loader-assigned sequence number used to preserve
+	// yaml declaration order during sort. Not a yaml field — set during
+	// walking. Earlier numbers sort first.
+	intentOrder int `yaml:"-"`
 }
 
 // canonicalNameAlias folds name/hostname/host into the single Name field.
@@ -95,6 +118,30 @@ func loadMtermFile(path string) (*mtermFile, error) {
 		return nil, err
 	}
 	return &mf, nil
+}
+
+// collectNestedHosts walks the nested groups tree depth-first, computing the
+// slash-delimited path for each group level and stamping every host with that
+// path plus a monotonic intentOrder so yaml order survives the later sort.
+// Output is appended to *out in walk order. A host's own `group:` field is
+// ignored when it appears under a structured group — the walked path wins.
+func collectNestedHosts(groups []mtermGroup, prefix string, counter *int, out *[]mtermHost) {
+	for _, g := range groups {
+		path := g.Name
+		if prefix != "" && g.Name != "" {
+			path = prefix + "/" + g.Name
+		} else if prefix != "" {
+			path = prefix
+		}
+		for i := range g.Hosts {
+			h := g.Hosts[i]
+			h.Group = path
+			h.intentOrder = *counter
+			*counter++
+			*out = append(*out, h)
+		}
+		collectNestedHosts(g.Groups, path, counter, out)
+	}
 }
 
 func (mf mtermForward) toForward() Forward {

@@ -123,14 +123,14 @@ func (p *picker) View() string {
 	var prev []string
 	firstHeader := true
 	for i, h := range v {
-		segs := pathSegments(h.Group)
+		segs := config.GroupSegments(h.Group)
 		if len(segs) == 0 {
 			segs = []string{"ungrouped"}
 		}
 		// Emit headers only for path segments beyond the common prefix with
 		// the previous host's path. A blank line separates top-level groups;
 		// nested sub-group transitions stay flush.
-		common := commonPrefixLen(prev, segs)
+		common := config.CommonPrefixLen(prev, segs)
 		for level := common; level < len(segs); level++ {
 			if level == 0 && !firstHeader {
 				b.WriteString("\n")
@@ -152,38 +152,6 @@ func (p *picker) View() string {
 		b.WriteString("\n")
 	}
 	return strings.TrimRight(b.String(), "\n")
-}
-
-// pathSegments splits a "/"-delimited group path into clean segments.
-// Empty input, leading/trailing slashes, and empty interior segments produce
-// no segment for that slot. "Home/Media" → ["Home", "Media"]; "/Home//Media/"
-// → ["Home", "Media"]; "" → nil.
-func pathSegments(group string) []string {
-	if group == "" {
-		return nil
-	}
-	parts := strings.Split(group, "/")
-	out := make([]string, 0, len(parts))
-	for _, s := range parts {
-		s = strings.TrimSpace(s)
-		if s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-// commonPrefixLen returns the count of matching leading segments between a
-// and b. Used by the picker to decide which group headers to (re-)emit when
-// the host's path differs from the previous host's path.
-func commonPrefixLen(a, b []string) int {
-	n := min(len(a), len(b))
-	for i := 0; i < n; i++ {
-		if a[i] != b[i] {
-			return i
-		}
-	}
-	return n
 }
 
 // renderGroupHeader formats a picker group separator like:

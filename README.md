@@ -87,7 +87,7 @@ All fields are optional unless noted. Field names are **lowercase** by conventio
 | `address`     | string    | `name`        | IP or DNS-resolvable hostname to dial. If omitted, mterm dials `name` directly via DNS. |
 | `user`        | string    | current user  | SSH username. |
 | `port`        | int       | `22`          | SSH port. |
-| `group`       | string    | (none)        | Picker group label. Slash-delimited paths nest sub-groups (`Home/Media`, `Work/Project1`). Hosts sort lexically by full path, then name. |
+| `group`       | string    | (none)        | Picker group label. Slash-delimited paths nest sub-groups (`Home/Media`, `Work/Project1`). For multi-host hierarchies prefer the structured `groups:` form (see below). |
 | `tags`        | []string  | (none)        | Tag list shown in `[…]` brackets next to the host in the picker. |
 | `forwards`    | []Forward | (none)        | Port-forwarding rules. See below. |
 | `bordercolor` | string    | (theme accent)| Hex `#RRGGBB` or `#RGB`. When this host's tab is active, the window frame, active tab chip, footer key hints, and `user@host:port` segment all use this color. Invalid values warn and are ignored. |
@@ -104,6 +104,57 @@ Each entry inside `forwards:`:
 | `bindport` | int    | **required** | Port to listen on. |
 | `dialaddr` | string | **required** | Destination address. |
 | `dialport` | int    | **required** | Destination port. |
+
+### Structured nested groups
+
+For multi-group setups, prefer the structured `groups:` form — yaml hierarchy
+becomes the slash-delimited group path internally, and **the order hosts and
+groups appear in the file is the order they appear in the picker**. No
+explicit `order:` field needed.
+
+```yaml
+groups:
+  - name: Work
+    groups:
+      - name: Lab
+        hosts:
+          - name: sao-dev
+            address: 10.122.26.36
+            user: dale
+      - name: MSFT
+        hosts:
+          - name: msft-optical-1
+            address: 10.122.161.81
+            user: administrator
+
+  - name: Home
+    groups:
+      - name: Media
+        hosts:
+          - name: plex-ubuntu
+            address: 192.168.2.50
+            bordercolor: "#FF3344"
+          - name: binarr
+            address: 192.168.2.12
+      - name: Development
+        hosts:
+          - name: sys-dev
+            address: 192.168.2.20
+            user: dale
+
+# Flat `hosts:` still works alongside `groups:` — use it for ssh_config
+# overlays or one-off entries you'd rather not nest. Slash-delimited
+# `group:` values funnel flat hosts into the same picker section as
+# their nested siblings.
+hosts:
+  - name: my-existing-ssh-alias
+    bordercolor: "#3344FF"
+```
+
+Sort rules:
+- Hosts appear in their yaml declaration order.
+- Groups appear in the order their first host appeared.
+- ssh_config-only hosts (no yaml counterpart) trail at the end.
 
 ### Full example
 

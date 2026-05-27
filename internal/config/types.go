@@ -62,6 +62,12 @@ type Host struct {
 	//   true  → explicitly on
 	//   false → explicitly off
 	Log *bool
+
+	// intentOrder is the loader-assigned sequence number used to preserve
+	// yaml declaration order during sort. Lower values sort first; hosts
+	// originating from ssh_config (with no yaml counterpart) get values
+	// after all yaml-declared hosts so they trail in the picker.
+	intentOrder int
 }
 
 // Logging reports whether per-session output should be logged for this host.
