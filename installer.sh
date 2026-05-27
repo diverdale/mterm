@@ -43,12 +43,20 @@ fi
 STAGE="dist/installer-stage"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/usr/local/bin"
+mkdir -p "$STAGE/usr/local/share/doc/mterm"
 
 # Fuse arm64 + amd64 into one universal binary. ~12 MiB vs ~6 MiB per
 # arch, but a single .pkg works on every Mac.
 echo "fusing universal binary..."
 lipo -create -output "$STAGE/usr/local/bin/mterm" "$ARM_BINARY" "$AMD_BINARY"
 chmod 755 "$STAGE/usr/local/bin/mterm"
+
+# Bundle the README so colleagues can read it offline at any point with
+# `open /usr/local/share/doc/mterm/README.md` or via their editor.
+if [[ -f README.md ]]; then
+    cp README.md "$STAGE/usr/local/share/doc/mterm/README.md"
+    chmod 644 "$STAGE/usr/local/share/doc/mterm/README.md"
+fi
 
 # Re-sign the universal binary with the Application cert if one is set;
 # pkgbuild preserves whatever signature is already on it. Without this,
@@ -101,5 +109,6 @@ Distribute:
 
 Uninstall (document for colleagues if asked):
   sudo rm /usr/local/bin/mterm
+  sudo rm -rf /usr/local/share/doc/mterm
   pkgutil --forget ${PKG_IDENTIFIER}
 NOTE
