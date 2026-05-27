@@ -279,6 +279,54 @@ The directory is created automatically on first run. Logs are raw bytes includin
 sed 's/\x1b\[[0-9;]*m//g' ~/.config/mterm/logs/prod-db-01/*.log | grep ERROR
 ```
 
+## Building for distribution
+
+The repo ships a `build.sh` that cross-compiles stripped binaries to `dist/`
+for darwin/arm64, darwin/amd64, linux/amd64, linux/arm64 and emits a
+`SHA256SUMS` file. Windows is excluded because mterm uses `SIGUSR1` for the
+in-app goroutine dump.
+
+```bash
+./build.sh                 # all default platforms
+./build.sh darwin/arm64    # build just one
+```
+
+### Codesign + notarize for macOS distribution
+
+Unsigned macOS binaries hit Gatekeeper and require a `xattr -d
+com.apple.quarantine` dance. If you have a Developer ID Application
+certificate, `build.sh` can codesign + notarize the darwin binaries so
+colleagues just unzip and run.
+
+One-time keychain setup:
+
+```bash
+# Generate an app-specific password at
+# https://appleid.apple.com → Sign-In and Security → App-Specific Passwords.
+xcrun notarytool store-credentials mterm-notary \
+    --apple-id <your-apple-id> \
+    --team-id <10-char-team-id> \
+    --password <app-specific-password>
+```
+
+Build + sign + notarize:
+
+```bash
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+export APPLE_KEYCHAIN_PROFILE="mterm-notary"
+./build.sh
+```
+
+Output goes to `dist/mterm-darwin-<arch>.zip` — that's the file to hand out.
+First launch on a colleague's machine does an online notarization check (~1s)
+then runs cleanly with no Gatekeeper prompt.
+
+To inspect what identities are available:
+
+```bash
+security find-identity -v -p codesigning
+```
+
 ## License
 
 TBD.
