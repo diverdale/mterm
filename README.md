@@ -29,6 +29,9 @@ The `~/.config/mterm/` directory is created automatically on first run.
 - Full-fidelity VT terminal: cursor, 24-bit color, scrollback, copy mode
 - Auto-reconnect on transport failure
 - Fuzzy host picker reading `~/.ssh/config` + `~/.config/mterm/hosts.yaml`
+  with per-host connection state — `◉` currently in a tab, `●` previously
+  connected (with "5m ago" / "2h ago" / "3d ago" relative time), `○` never
+  connected; group headers show counts (`▸ HOME (3)`)
 - Themable UI (Midnight / Matrix / Synthwave) with frame, tab strip, footer
 - Per-host visual identity — `bordercolor:` tints the frame, active tab chip, and footer key hints so prod ≠ staging at a glance
 - Per-session output logging to `~/.config/mterm/logs/<host>/<timestamp>.log` (default on; per-host opt-out)
@@ -272,6 +275,7 @@ mterm lives under `~/.config/mterm/`:
 |---------------------------------------------------|----------------------------------|
 | `~/.config/mterm/hosts.yaml`                      | Host overlay (this document)     |
 | `~/.config/mterm/logs/<host>/<YYYYMMDD-HHMMSS>.log` | Per-session output logs        |
+| `~/.config/mterm/history.json`                    | Last-connected timestamps per host (powers the picker's "2h ago" decorations) |
 
 The directory is created automatically on first run. Logs are raw bytes including ANSI escapes — replay faithfully with `less -R <file>`, or strip ANSI for grep:
 

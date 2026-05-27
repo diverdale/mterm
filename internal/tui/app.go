@@ -10,6 +10,7 @@ import (
 	"mterm/internal/appmeta"
 	"mterm/internal/config"
 	"mterm/internal/diag"
+	"mterm/internal/history"
 	"mterm/internal/sessionlog"
 	mssh "mterm/internal/ssh"
 )
@@ -68,6 +69,10 @@ type App struct {
 	statusMsg     string
 	tickCount     int    // render-tick counter, drives status spinners
 	logRoot       string // root dir for per-session logs; "" disables logging
+
+	// history tracks the last successful connect time per host. Optional —
+	// nil disables the connection-history decorations in the picker.
+	history *history.Store
 }
 
 // NewApp builds the root model.
@@ -104,6 +109,10 @@ func (a *App) clearSyncSet() { a.syncTabs = map[int]bool{} }
 // SetLogRoot sets the per-session log directory. Empty disables logging for
 // every tab regardless of host opt-in. Call before Run.
 func (a *App) SetLogRoot(path string) { a.logRoot = path }
+
+// SetHistory attaches a connection-history store. nil disables the picker's
+// last-connected decorations and the on-connect record. Call before Run.
+func (a *App) SetHistory(h *history.Store) { a.history = h }
 
 // Init starts the render ticker.
 func (a *App) Init() tea.Cmd {
@@ -383,6 +392,13 @@ func (a *App) handleConnected(m connectedMsg) {
 		a.removeTabAt(idx)
 		return
 	}
+	// Stamp the successful connect into the history store so the picker
+	// can show "last connected" decorations. Failures don't update history
+	// (we only count actual sessions). Errors are silent — losing one
+	// history write isn't worth crashing the connect path over.
+	if a.history != nil {
+		_ = a.history.RecordConnect(a.tabs[idx].host.Name, time.Now())
+	}
 	a.openLoggerForTab(a.tabs[idx])
 	a.tabs[idx].attach(m.sess)
 }
@@ -434,8 +450,27 @@ func fmtUptime(d time.Duration) string {
 	return fmt.Sprintf("%02d:%02d:%02d", s/3600, (s/60)%60, s%60)
 }
 
+// pickerDecorations gathers per-render context the picker uses to render
+// host rows — connection history (from the persisted store) and the set of
+// hosts currently in an open tab (derived from a.tabs in-memory).
+func (a *App) pickerDecorations() pickerDecorations {
+	deco := pickerDecorations{Now: time.Now()}
+	if a.history != nil {
+		deco.LastConnected = a.history.All()
+	}
+	if len(a.tabs) > 0 {
+		open := make(map[string]bool, len(a.tabs))
+		for _, t := range a.tabs {
+			open[t.host.Name] = true
+		}
+		deco.OpenHosts = open
+	}
+	return deco
+}
+
 func (a *App) pickerView() string {
 	a.picker.setSize(a.width-chromeCols, a.height-4)
+	a.picker.setDecorations(a.pickerDecorations())
 	footer := renderFooter(footerOpts{
 		hints: []keyHint{{"enter", "connect"}, {"type", "filter"}, {"esc", "back"}},
 		info:  fmt.Sprintf("%d hosts", len(a.picker.all)),

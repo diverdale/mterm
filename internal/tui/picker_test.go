@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -247,12 +248,60 @@ func TestPickerNestedHostRowIndented(t *testing.T) {
 	out := p.View()
 	stripped := ansiRE.ReplaceAllString(out, "")
 
-	// Depth 2 → 2*2 = 4 spaces of indent, then "> " for the cursor row or
-	// "  " for non-cursor rows.
-	if !strings.Contains(stripped, "    > alpha") {
-		t.Fatalf("cursor row at depth 2 should start with %q; stripped:\n%s", "    > alpha", stripped)
+	// Depth 2 → 2*2 = 4 spaces of indent, then "> "/"  " cursor pad, then
+	// the connection glyph (○ for never-connected), then the name.
+	if !strings.Contains(stripped, "    > ○ alpha") {
+		t.Fatalf("cursor row at depth 2 should start with %q; stripped:\n%s", "    > ○ alpha", stripped)
 	}
-	if !strings.Contains(stripped, "      beta") {
-		t.Fatalf("non-cursor row at depth 2 should have 6 leading spaces; stripped:\n%s", stripped)
+	if !strings.Contains(stripped, "      ○ beta") {
+		t.Fatalf("non-cursor row at depth 2 should be indented + have glyph; stripped:\n%s", stripped)
+	}
+}
+
+func TestPickerConnectionGlyphsReflectDeco(t *testing.T) {
+	now := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
+	hosts := []config.Host{
+		{Name: "open-now"},
+		{Name: "ever"},
+		{Name: "never"},
+	}
+	p := newPicker(hosts)
+	p.setSize(80, 24)
+	p.setDecorations(pickerDecorations{
+		OpenHosts:     map[string]bool{"open-now": true},
+		LastConnected: map[string]time.Time{"ever": now.Add(-2 * time.Hour)},
+		Now:           now,
+	})
+	stripped := ansiRE.ReplaceAllString(p.View(), "")
+
+	if !strings.Contains(stripped, "◉ open-now") {
+		t.Errorf("open-now should render with ◉; got:\n%s", stripped)
+	}
+	if !strings.Contains(stripped, "● ever") {
+		t.Errorf("ever should render with ●; got:\n%s", stripped)
+	}
+	if !strings.Contains(stripped, "○ never") {
+		t.Errorf("never should render with ○; got:\n%s", stripped)
+	}
+	if !strings.Contains(stripped, "2h ago") {
+		t.Errorf("ever should show '2h ago'; got:\n%s", stripped)
+	}
+}
+
+func TestPickerGroupHeaderShowsCount(t *testing.T) {
+	hosts := []config.Host{
+		{Name: "a", Group: "Home/Media"},
+		{Name: "b", Group: "Home/Media"},
+		{Name: "c", Group: "Home/Development"},
+	}
+	p := newPicker(hosts)
+	p.setSize(80, 24)
+	out := p.View()
+
+	// Home has 3 hosts (2 + 1) across two sub-groups.
+	for _, want := range []string{"▸ HOME (3)", "▸ MEDIA (2)", "▸ DEVELOPMENT (1)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected header %q in:\n%s", want, out)
+		}
 	}
 }

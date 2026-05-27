@@ -93,6 +93,13 @@ XL ≈ structural change to the app, multiple branches.
 **Open:** Variable interpolation (`{{host}}`, prompted vars); multi-line sequencing with wait-for-prompt.
 **Depends on:** command palette (already shipped) — same UI pattern.
 
+### Left sidebar — persistent windows list
+**What:** Replace (or augment) the top tabstrip with a tall left-edge sidebar showing all open tabs as chips with host + status + connection age. tmux's `^B s` window-list, but always visible. Body shrinks; you always see what else is running.
+**Why:** Once you're juggling 4+ sessions the horizontal tabstrip becomes the limiting factor. A vertical sidebar scales to N tabs comfortably and surfaces inactive-tab state (activity, silence, sync membership) without cycling.
+**Size:** L
+**Open:** Width policy (fixed cols vs proportional)? Toggle keybinding (`^B b`?) to hide/show? Replace tabstrip entirely or coexist? Per-chip activity indicator (recent output, idle time)?
+**Depends on:** activity/silence indicators (Tier-2) feed naturally into this. Snapshot architecture handles the per-tab body render fine; the chrome refactor is the main lift.
+
 ### Workspaces
 **What:** `^B w s <name>` saves current tab set; `^B w r <name>` restores. Stored as YAML.
 **Why:** Resume yesterday's investigation in one keystroke.

@@ -13,6 +13,7 @@ import (
 	"mterm/internal/appmeta"
 	"mterm/internal/config"
 	"mterm/internal/diag"
+	"mterm/internal/history"
 	mssh "mterm/internal/ssh"
 	"mterm/internal/tui"
 )
@@ -94,6 +95,13 @@ func run() error {
 	app := tui.NewApp(res.Hosts, connect)
 	if logsDir, err := config.LogsDir(); err == nil {
 		app.SetLogRoot(logsDir)
+	}
+	if histPath, err := config.HistoryFile(); err == nil {
+		if hist, err := history.Open(histPath); err == nil {
+			app.SetHistory(hist)
+		} else {
+			fmt.Fprintln(os.Stderr, appmeta.Name+": warning: history load:", err)
+		}
 	}
 	p := tea.NewProgram(app, tea.WithAltScreen())
 	_, err = p.Run()

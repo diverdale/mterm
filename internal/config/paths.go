@@ -35,6 +35,16 @@ func LogsDir() (string, error) {
 	return filepath.Join(dir, "logs"), nil
 }
 
+// HistoryFile returns the path to the connection-history JSON file (one
+// entry per host, value = last successful connect time).
+func HistoryFile() (string, error) {
+	dir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "history.json"), nil
+}
+
 // BootstrapConfigDir creates ConfigDir() if it does not yet exist. Idempotent.
 // Called at startup so a fresh install can drop hosts.yaml in place without
 // the user having to mkdir first.
