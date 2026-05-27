@@ -105,12 +105,23 @@ Each entry inside `forwards:`:
 | `dialaddr` | string | **required** | Destination address. |
 | `dialport` | int    | **required** | Destination port. |
 
-### Structured nested groups
+### Two ways to define hosts
 
-For multi-group setups, prefer the structured `groups:` form — yaml hierarchy
-becomes the slash-delimited group path internally, and **the order hosts and
-groups appear in the file is the order they appear in the picker**. No
-explicit `order:` field needed.
+There are two top-level keys: `hosts:` (a flat list) and `groups:` (a nested
+tree). They can coexist in the same file.
+
+| Form                  | Best for                                          |
+|-----------------------|---------------------------------------------------|
+| `hosts:` (flat)       | A handful of hosts; ssh_config overlays; quick one-offs |
+| `groups:` (nested)    | Multi-section setups (Home/Work, Prod/Staging, per-customer); when order in the picker matters |
+
+Sort rules (apply to both forms together):
+
+- Hosts appear in the order they're written in the file.
+- Groups appear in the order their first host appears in the file.
+- ssh_config-only hosts (no yaml counterpart) trail at the end as "ungrouped."
+
+### Nested form (recommended for hierarchies)
 
 ```yaml
 groups:
@@ -121,6 +132,7 @@ groups:
           - name: sao-dev
             address: 10.122.26.36
             user: dale
+            log: false
       - name: MSFT
         hosts:
           - name: msft-optical-1
@@ -141,22 +153,14 @@ groups:
           - name: sys-dev
             address: 192.168.2.20
             user: dale
-
-# Flat `hosts:` still works alongside `groups:` — use it for ssh_config
-# overlays or one-off entries you'd rather not nest. Slash-delimited
-# `group:` values funnel flat hosts into the same picker section as
-# their nested siblings.
-hosts:
-  - name: my-existing-ssh-alias
-    bordercolor: "#3344FF"
 ```
 
-Sort rules:
-- Hosts appear in their yaml declaration order.
-- Groups appear in the order their first host appeared.
-- ssh_config-only hosts (no yaml counterpart) trail at the end.
+Hosts inherit their slash-delimited group path from their position in the
+tree — no `group:` field needed under nested groups (any value would be
+overridden by the walk anyway). Sub-groups can nest arbitrarily deep; the
+picker indents two spaces per level.
 
-### Full example
+### Flat form (simple / ssh_config overlay)
 
 ```yaml
 hosts:
@@ -175,15 +179,15 @@ hosts:
         dialaddr: 127.0.0.1
         dialport: 5432
 
-  # Overlay extra metadata on an alias already defined in ~/.ssh/config.
-  # name matches the ssh_config "Host" alias; only the listed fields
-  # override; the rest (HostName, User, IdentityFile, etc.) come from
+  # Overlay extra metadata on an alias already in ~/.ssh/config.
+  # `name` matches the ssh_config "Host" alias; only the listed fields
+  # override; the rest (HostName, User, IdentityFile, …) come from
   # ssh_config.
   - name: my-existing-alias
     group: dev
     bordercolor: "#3344FF"
 
-  # Name aliases are interchangeable — pick whichever reads best to you.
+  # Name aliases are interchangeable — pick whichever reads best.
   - hostname: another-host       # same as `name:`
     address: 10.0.0.7
     user: ubuntu
@@ -193,17 +197,62 @@ hosts:
     address: 10.0.0.8
     log: false
 
-  # Nested groups: slash-delimited paths render as indented sub-groups in
-  # the picker. Mix-and-match flat and nested groups freely.
-  - name: plex
-    address: 192.168.2.50
-    group: Home/Media
-  - name: sys-dev
-    address: 192.168.2.20
-    group: Home/Development
-  - name: project1-box1
-    address: 10.0.1.1
-    group: Work/Project1
+  # A flat entry can land in a nested-form group via a slash path —
+  # useful for ssh_config aliases you want to slot into a hierarchy
+  # without restructuring.
+  - name: ssh-aliased-host
+    group: Work/Lab
+    bordercolor: "#3344FF"
+```
+
+### Kitchen sink — both forms together
+
+```yaml
+# Nested groups define the hierarchy and the picker order.
+groups:
+  - name: Work
+    groups:
+      - name: Lab
+        hosts:
+          - name: sao-dev
+            address: 10.122.26.36
+            user: dale
+          - name: lab-bastion
+            address: 10.122.26.1
+            user: dale
+            forwards:
+              - type: local
+                bindport: 8080
+                dialaddr: 127.0.0.1
+                dialport: 80
+      - name: MSFT
+        hosts:
+          - name: msft-optical-1
+            address: 10.122.161.81
+            user: administrator
+
+  - name: Home
+    groups:
+      - name: Media
+        hosts:
+          - name: plex-ubuntu
+            address: 192.168.2.50
+            bordercolor: "#FF3344"
+          - name: binarr
+            address: 192.168.2.12
+      - name: Development
+        hosts:
+          - name: sys-dev
+            address: 192.168.2.20
+            user: dale
+            tags: [linux, primary]
+
+# Flat overlays for ssh_config entries — no need to nest these.
+hosts:
+  - name: existing-ssh-alias-1
+    bordercolor: "#3344FF"
+  - name: existing-ssh-alias-2
+    group: Work/Lab        # slip into a nested group via slash path
 ```
 
 ## ssh_config interaction
