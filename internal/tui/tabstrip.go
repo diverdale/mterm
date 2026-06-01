@@ -2,17 +2,27 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
 // statusGlyph returns the colored glyph for a tab's connection status. While
-// connecting it animates via the spinner counter.
-func statusGlyph(s tabStatus, spinnerCounter int) string {
+// connecting it animates via the spinner counter. When the tab is connected
+// AND has unseen background activity, the glyph's color shifts to encode
+// the activity state — amber for "new output", accent for "went quiet."
+func statusGlyph(s tabStatus, spinnerCounter int, act tabActivity) string {
 	switch s {
 	case statusConnected:
-		return sty.connected.Render("●")
+		switch act {
+		case activityActivity:
+			return lipgloss.NewStyle().Foreground(active.Warning).Bold(true).Render("●")
+		case activitySilence:
+			return lipgloss.NewStyle().Foreground(active.Accent).Bold(true).Render("●")
+		default:
+			return sty.connected.Render("●")
+		}
 	case statusFailed:
 		return sty.errorText.Render("✖")
 	default:
@@ -27,12 +37,13 @@ func statusGlyph(s tabStatus, spinnerCounter int) string {
 // newline.
 func renderTabStrip(tabs []*sessionTab, activeIdx, spinnerCounter, width int, s styleSet, syncIDs map[int]bool) string {
 	chips := make([]string, 0, len(tabs))
+	now := time.Now()
 	for i, t := range tabs {
 		// The status glyph carries its own color. Render it as its own span
 		// between separately-styled text spans — never nest pre-styled content
 		// inside another style, since the glyph's embedded reset would break
 		// the outer style for everything after it.
-		glyph := statusGlyph(t.status(), spinnerCounter)
+		glyph := statusGlyph(t.status(), spinnerCounter, t.activityState(i == activeIdx, now))
 		text := fmt.Sprintf(" %d %s", i+1, t.title())
 		inSync := syncIDs[t.id]
 		// The active tab is outlined with brackets; inactive tabs use matching

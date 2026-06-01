@@ -30,6 +30,13 @@ The `~/.config/mterm/` directory is created automatically on first run.
 - Mouse-wheel scrollback on the active session — scroll up to browse
   history, type any key to snap back to live. Viewport stays anchored to
   the same content as new output streams in
+- Activity / silence indicators in the tab strip — background tabs that
+  receive new output get a warning-color glyph; tabs that go quiet after
+  activity transition to an accent-color "done" glyph. Focusing a tab
+  clears its badge.
+- Per-host startup commands — `on_connect: [...]` in hosts.yaml runs
+  shell commands right after handshake (auto-attach to tmux/screen,
+  jump into a working dir, etc.)
 - Auto-reconnect on transport failure
 - Fuzzy host picker reading `~/.ssh/config` + `~/.config/mterm/hosts.yaml`
   with per-host connection state — `◉` currently in a tab, `●` previously
@@ -98,6 +105,7 @@ All fields are optional unless noted. Field names are **lowercase** by conventio
 | `forwards`    | []Forward | (none)        | Port-forwarding rules. See below. |
 | `bordercolor` | string    | (theme accent)| Hex `#RRGGBB` or `#RGB`. When this host's tab is active, the window frame, active tab chip, footer key hints, and `user@host:port` segment all use this color. Invalid values warn and are ignored. |
 | `identityfile`| string    | (none)        | Path to an SSH private key file. Tried *before* the agent, mimicking `ssh`'s fallback. `~/` and `$HOME` are expanded. Encrypted keys are not supported — load those via `ssh-add --apple-use-keychain` instead. |
+| `on_connect`  | []string  | (none)        | Shell commands to send to the remote after handshake. Each gets a trailing CR. Common uses: auto-attach to tmux/screen (`tmux new -A -s mterm-$USER`), `cd` into a working dir. |
 | `log`         | bool      | `true`        | Set `false` to opt out of per-session output logging for this host. |
 
 ### Forward fields

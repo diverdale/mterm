@@ -51,6 +51,7 @@ type mtermHost struct {
 	Forwards     []mtermForward `yaml:"forwards"`
 	BorderColor  string         `yaml:"bordercolor"`
 	IdentityFile string         `yaml:"identityfile"` // ~ and $HOME expanded at connect time
+	OnConnect    []string       `yaml:"on_connect"`   // commands run after handshake
 	Log          *bool          `yaml:"log"`          // nil = default-on; false = opt-out
 
 	// intentOrder is the loader-assigned sequence number used to preserve

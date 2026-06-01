@@ -284,9 +284,7 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 		return a.shutdown()
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		idx := int(k.Runes[0] - '1')
-		if idx < len(a.tabs) {
-			a.active = idx
-		}
+		a.setActive(idx)
 	}
 	return nil
 }
@@ -332,7 +330,7 @@ func (a *App) openTab(host config.Host) tea.Cmd {
 	a.nextID++
 	tab := newSessionTab(id, host, a.width, a.height)
 	a.tabs = append(a.tabs, tab)
-	a.active = len(a.tabs) - 1
+	a.setActive(len(a.tabs) - 1)
 	a.mode = modeSession
 	if a.connect == nil {
 		return nil
@@ -356,7 +354,19 @@ func (a *App) cycleTab(delta int) {
 	if len(a.tabs) == 0 {
 		return
 	}
-	a.active = (a.active + delta + len(a.tabs)) % len(a.tabs)
+	a.setActive((a.active + delta + len(a.tabs)) % len(a.tabs))
+}
+
+// setActive switches focus to tab idx and marks it caught-up on activity so
+// its activity badge clears. Bounds-checked; out-of-range idx is a no-op.
+// Centralizes the marking so every code path that changes the active tab
+// gets the badge-clear behavior for free.
+func (a *App) setActive(idx int) {
+	if idx < 0 || idx >= len(a.tabs) {
+		return
+	}
+	a.active = idx
+	a.tabs[idx].markSeen()
 }
 
 // removeTabAt closes and removes the tab at index idx.
@@ -368,7 +378,7 @@ func (a *App) removeTabAt(idx int) {
 	a.tabs[idx].close()
 	a.tabs = append(a.tabs[:idx], a.tabs[idx+1:]...)
 	if a.active >= len(a.tabs) {
-		a.active = len(a.tabs) - 1
+		a.setActive(len(a.tabs) - 1)
 	}
 	if len(a.tabs) == 0 {
 		a.mode = modePicker

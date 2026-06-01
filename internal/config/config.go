@@ -209,6 +209,9 @@ func applyOverlay(h *Host, mh mtermHost) {
 	if mh.IdentityFile != "" {
 		h.IdentityFile = mh.IdentityFile
 	}
+	if len(mh.OnConnect) > 0 {
+		h.OnConnect = mh.OnConnect
+	}
 	if mh.Log != nil {
 		h.Log = mh.Log
 	}
@@ -238,6 +241,7 @@ func hostFromMterm(mh mtermHost) Host {
 		Forwards:     forwards,
 		BorderColor:  mh.BorderColor,
 		IdentityFile: mh.IdentityFile,
+		OnConnect:    mh.OnConnect,
 		Log:          mh.Log,
 		intentOrder:  mh.intentOrder,
 	}

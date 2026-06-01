@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -72,6 +73,16 @@ type sessionTab struct {
 	// SAME content as the remote keeps producing output.
 	scrollOffset      atomic.Int32
 	scrollbackLenSeen atomic.Int32
+
+	// Activity counters power the unfocused-tab activity/silence badges.
+	// activityCounter is bumped by the read goroutine on every batch of
+	// bytes; lastSeenCounter is captured by the main goroutine when the
+	// tab is focused. Their difference = "new output since last viewed."
+	// lastActivityUnixNano lets the silence detector say "this tab was
+	// active but went quiet N seconds ago."
+	activityCounter      atomic.Uint64
+	lastActivityUnixNano atomic.Int64
+	lastSeenCounter      uint64 // main-goroutine-only; no atomic needed
 }
 
 // newSessionTab creates a tab sized to the given total area.
@@ -107,6 +118,7 @@ func (t *sessionTab) attach(s *mssh.Session) {
 	go t.readLoop()
 	go t.snapshotLoop()
 	go t.replyLoop()
+	t.runOnConnect()
 }
 
 // replyLoop forwards bytes the VT wants to send BACK to the remote program
@@ -197,6 +209,8 @@ func (t *sessionTab) readLoop() {
 		n, err := s.Read(buf)
 		if n > 0 {
 			t.term.Write(buf[:n])
+			t.activityCounter.Add(1)
+			t.lastActivityUnixNano.Store(time.Now().UnixNano())
 			if l := t.logger.Load(); l != nil {
 				// Best-effort: a log write failure does not interrupt the
 				// session. Closed-file errors during shutdown are expected.
@@ -298,6 +312,72 @@ func (t *sessionTab) snapToLive() { t.scrollOffset.Store(0) }
 // chrome rendering ("scroll 42/200" style indicators).
 func (t *sessionTab) scrollPos() (offset, total int) {
 	return int(t.scrollOffset.Load()), t.term.ScrollbackLen()
+}
+
+// tabActivity is the kind of background-output indicator a tab should show.
+type tabActivity int
+
+const (
+	activityNone     tabActivity = iota // no badge (active tab or unfocused with no new output)
+	activityActivity                    // unfocused with new output since last focused
+	activitySilence                     // was active, has been quiet for ≥ silenceThreshold
+)
+
+// silenceThreshold is how long an unfocused-but-previously-active tab must
+// stay quiet before its badge transitions from "activity" to "silence."
+// Tuned for long-running commands (deploys, builds) — fast enough to
+// notice when something finishes, slow enough not to flicker between
+// states during normal interactive output bursts.
+const silenceThreshold = 30 * time.Second
+
+// activityState returns the badge state for this tab given whether it is
+// currently focused and the wall-clock "now". The active tab always returns
+// activityNone — the user is already looking at it. An unfocused tab whose
+// activityCounter advanced past lastSeenCounter is "active" until the
+// silenceThreshold elapses with no further activity, at which point it
+// becomes "silence."
+func (t *sessionTab) activityState(focused bool, now time.Time) tabActivity {
+	if focused {
+		return activityNone
+	}
+	cur := t.activityCounter.Load()
+	if cur == t.lastSeenCounter {
+		return activityNone
+	}
+	lastNs := t.lastActivityUnixNano.Load()
+	if lastNs == 0 {
+		return activityActivity
+	}
+	if now.Sub(time.Unix(0, lastNs)) >= silenceThreshold {
+		return activitySilence
+	}
+	return activityActivity
+}
+
+// markSeen captures the current activity counter so subsequent reads see
+// the tab as caught-up. Called when the tab becomes the active one.
+func (t *sessionTab) markSeen() {
+	t.lastSeenCounter = t.activityCounter.Load()
+}
+
+// runOnConnect sends each command in host.OnConnect to the remote shell as
+// if the user had typed it followed by Enter. Best-effort: a failed write
+// (e.g. the session closed before the goroutine ran) is silently dropped.
+// Each command gets a "\r" appended unless it already ends in one.
+func (t *sessionTab) runOnConnect() {
+	if len(t.host.OnConnect) == 0 {
+		return
+	}
+	s := t.sess.Load()
+	if s == nil {
+		return
+	}
+	for _, cmd := range t.host.OnConnect {
+		if !strings.HasSuffix(cmd, "\r") && !strings.HasSuffix(cmd, "\n") {
+			cmd += "\r"
+		}
+		_, _ = s.Write([]byte(cmd))
+	}
 }
 
 // h2body converts a full tab area (w, h) into the inner terminal body size,

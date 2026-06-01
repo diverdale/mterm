@@ -61,7 +61,7 @@ func buildCommands(a *App) []command {
 			group: "Navigation",
 			action: func(a *App) tea.Cmd {
 				if idx >= 0 && idx < len(a.tabs) {
-					a.active = idx
+					a.setActive(idx)
 					a.mode = modeSession
 				}
 				return nil

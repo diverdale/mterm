@@ -57,6 +57,11 @@ type Host struct {
 	Forwards     []Forward
 	BorderColor  string // hex like "#RRGGBB" or "#RGB"; "" = no override
 
+	// OnConnect is a list of shell commands to send to the remote right
+	// after the session connects. Each gets a trailing CR. Empty list =
+	// no auto-run.
+	OnConnect []string
+
 	// Log is a tri-state opt-in/out for per-session output logging:
 	//   nil   → use the default (logging on)
 	//   true  → explicitly on

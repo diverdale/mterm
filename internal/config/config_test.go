@@ -340,6 +340,46 @@ func TestLoadAndMergeAddressFallsBackToName(t *testing.T) {
 	}
 }
 
+func TestLoadAndMergeOnConnectFlowsThrough(t *testing.T) {
+	// `on_connect: [...]` set in hosts.yaml must reach
+	// config.Host.OnConnect verbatim from both flat and nested forms.
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`groups:
+  - name: Work
+    hosts:
+      - name: nested-host
+        address: 10.0.0.1
+        on_connect:
+          - "tmux new -A -s mterm-work"
+          - "cd ~/proj"
+hosts:
+  - name: flat-host
+    address: 10.0.0.2
+    on_connect: ["screen -DR"]
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", res.Warnings)
+	}
+	got := map[string][]string{}
+	for _, h := range res.Hosts {
+		got[h.Name] = h.OnConnect
+	}
+	want := map[string][]string{
+		"nested-host": {"tmux new -A -s mterm-work", "cd ~/proj"},
+		"flat-host":   {"screen -DR"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("OnConnect map = %v, want %v", got, want)
+	}
+}
+
 func TestLoadAndMergeIdentityFileFlowsThrough(t *testing.T) {
 	// `identityfile` set in hosts.yaml must reach config.Host.IdentityFile
 	// in both forms: flat and nested. ssh_config-loaded values also

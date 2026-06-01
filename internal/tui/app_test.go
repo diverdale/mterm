@@ -578,6 +578,70 @@ func TestAppSessionKeystrokeSnapsScrollbackToLive(t *testing.T) {
 	}
 }
 
+func TestActivityStateTransitions(t *testing.T) {
+	tab := newSessionTab(1, config.Host{Name: "a"}, 80, 24)
+	now := time.Now()
+
+	// Fresh tab + focused = no badge.
+	if got := tab.activityState(true, now); got != activityNone {
+		t.Fatalf("focused fresh tab = %v, want none", got)
+	}
+	// Fresh tab + unfocused with no activity = still no badge.
+	if got := tab.activityState(false, now); got != activityNone {
+		t.Fatalf("unfocused fresh tab = %v, want none", got)
+	}
+
+	// Simulate a read-loop iteration's bookkeeping.
+	tab.activityCounter.Add(1)
+	tab.lastActivityUnixNano.Store(now.UnixNano())
+
+	// Unfocused with recent activity = activity.
+	if got := tab.activityState(false, now); got != activityActivity {
+		t.Fatalf("unfocused with new output = %v, want activity", got)
+	}
+	// Focused clears the badge.
+	if got := tab.activityState(true, now); got != activityNone {
+		t.Fatalf("focused tab should never show a badge; got %v", got)
+	}
+
+	// Past the silence threshold the badge transitions to silence.
+	later := now.Add(silenceThreshold + time.Second)
+	if got := tab.activityState(false, later); got != activitySilence {
+		t.Fatalf("after silenceThreshold = %v, want silence", got)
+	}
+
+	// markSeen catches the tab up — badge goes back to none.
+	tab.markSeen()
+	if got := tab.activityState(false, later); got != activityNone {
+		t.Fatalf("after markSeen = %v, want none", got)
+	}
+}
+
+func TestSetActiveMarksSeen(t *testing.T) {
+	app := newTestApp()
+	app.tabs = []*sessionTab{
+		newSessionTab(1, config.Host{Name: "a"}, 80, 24),
+		newSessionTab(2, config.Host{Name: "b"}, 80, 24),
+	}
+	app.active = 0
+	// Tab 2 racks up activity while in the background.
+	app.tabs[1].activityCounter.Add(5)
+	app.tabs[1].lastActivityUnixNano.Store(time.Now().UnixNano())
+	if got := app.tabs[1].activityState(false, time.Now()); got != activityActivity {
+		t.Fatalf("tab 2 should show activity before focus; got %v", got)
+	}
+	// Switching to tab 2 clears its badge.
+	app.setActive(1)
+	if got := app.tabs[1].activityState(true, time.Now()); got != activityNone {
+		t.Fatalf("after setActive(1), badge should clear; got %v", got)
+	}
+	// And going back to tab 1 (which had no activity) shows nothing on it.
+	app.setActive(0)
+	if got := app.tabs[0].activityState(true, time.Now()); got != activityNone {
+		t.Fatalf("tab 1 should remain badge-free; got %v", got)
+	}
+}
+
 func TestAppCtrlCPassesThroughToSession(t *testing.T) {
 	// Ctrl-C is the universal "interrupt remote process" signal — mterm
 	// must NOT intercept it. Quit is on the deliberate ^B q two-step.
