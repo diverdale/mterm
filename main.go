@@ -11,6 +11,7 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 
 	"mterm/internal/appmeta"
+	"mterm/internal/colors"
 	"mterm/internal/config"
 	"mterm/internal/diag"
 	"mterm/internal/history"
@@ -58,7 +59,20 @@ func run() error {
 	// fall through to the existing "no hosts" error path.
 	_ = config.BootstrapConfigDir()
 
-	res, err := config.Load()
+	// Load the named-color palette first (built-ins + ~/.config/<app>/
+	// colors.yaml overlay) so bordercolor values like "limegreen" resolve
+	// during config parsing.
+	var colorMap map[string]string
+	if cpath, err := config.ColorsFile(); err == nil {
+		if m, err := colors.Open(cpath); err == nil {
+			colorMap = m
+		} else {
+			fmt.Fprintln(os.Stderr, appmeta.Name+": warning: colors load:", err)
+			colorMap = colors.Builtins()
+		}
+	}
+
+	res, err := config.LoadWithColors(colorMap)
 	if err != nil {
 		return err
 	}

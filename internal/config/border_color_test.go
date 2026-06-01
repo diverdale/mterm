@@ -21,7 +21,7 @@ func TestParseBorderColor(t *testing.T) {
 		{"#12 345", "", true},  // space in hex
 	}
 	for _, tc := range cases {
-		got, err := parseBorderColor(tc.in)
+		got, err := parseBorderColor(tc.in, nil)
 		if tc.wantErr {
 			if err == nil {
 				t.Errorf("parseBorderColor(%q) want error, got nil", tc.in)

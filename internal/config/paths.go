@@ -55,6 +55,16 @@ func WorkspacesFile() (string, error) {
 	return filepath.Join(dir, "workspaces.json"), nil
 }
 
+// ColorsFile returns the path to the user color-name overlay (yaml map of
+// name → hex). Merged on top of the built-in palette by internal/colors.
+func ColorsFile() (string, error) {
+	dir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "colors.yaml"), nil
+}
+
 // BootstrapConfigDir creates ConfigDir() if it does not yet exist. Idempotent.
 // Called at startup so a fresh install can drop hosts.yaml in place without
 // the user having to mkdir first.

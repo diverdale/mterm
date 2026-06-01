@@ -13,8 +13,16 @@ type Result struct {
 	Warnings []string // non-fatal problems (parse errors, etc.)
 }
 
-// Load reads ~/.ssh/config and the app hosts.yaml and merges them.
+// Load reads ~/.ssh/config and the app hosts.yaml and merges them. The
+// nil colors map disables named-color resolution for bordercolor — use
+// LoadWithColors to also accept "limegreen" / "prodred" style names.
 func Load() (*Result, error) {
+	return LoadWithColors(nil)
+}
+
+// LoadWithColors is Load + a name→hex map for resolving non-hex
+// bordercolor values. Pass internal/colors.Open(...)'s output.
+func LoadWithColors(colors map[string]string) (*Result, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -24,10 +32,11 @@ func Load() (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return loadAndMerge(sshPath, hostsPath)
+	return loadAndMerge(sshPath, hostsPath, colors)
 }
 
-// loadAndMerge is the testable core of Load. Pipeline:
+// loadAndMerge is the testable core of Load. The colors map (nil OK)
+// gives bordercolor named-color resolution. Pipeline:
 //  1. Read ssh_config (file order) and hosts.yaml (decoder-strict).
 //  2. Collect all yaml-declared hosts in declaration order with monotonic
 //     intentOrder — nested groups walked depth-first, then flat hosts.
@@ -40,7 +49,7 @@ func Load() (*Result, error) {
 //  6. Sort hierarchically: groups appear in the order their first host
 //     appeared; within a group, hosts in intentOrder; sub-groups inherit
 //     their parent's contiguity.
-func loadAndMerge(sshPath, mtermPath string) (*Result, error) {
+func loadAndMerge(sshPath, mtermPath string, colors map[string]string) (*Result, error) {
 	res := &Result{}
 
 	sshHosts, err := loadSSHConfig(sshPath)
@@ -111,7 +120,7 @@ func loadAndMerge(sshPath, mtermPath string) (*Result, error) {
 	// 4. Validate bordercolor; collect into result.
 	for _, h := range out {
 		if h.BorderColor != "" {
-			parsed, err := parseBorderColor(h.BorderColor)
+			parsed, err := parseBorderColor(h.BorderColor, colors)
 			if err != nil {
 				res.Warnings = append(res.Warnings,
 					fmt.Sprintf("mterm config: host %q bordercolor %q: %v", h.Name, h.BorderColor, err))

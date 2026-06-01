@@ -32,7 +32,7 @@ hosts:
         dialport: 80
 `)
 
-	res, err := loadAndMerge(sshPath, mtermPath)
+	res, err := loadAndMerge(sshPath, mtermPath, nil)
 	if err != nil {
 		t.Fatalf("loadAndMerge: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestMergeBadYAMLIsWarningNotFatal(t *testing.T) {
 	sshPath := writeTemp(t, "config", "Host a\n  HostName 1.2.3.4\n")
 	mtermPath := writeTemp(t, "hosts.yaml", "hosts: [ this is not valid")
 
-	res, err := loadAndMerge(sshPath, mtermPath)
+	res, err := loadAndMerge(sshPath, mtermPath, nil)
 	if err != nil {
 		t.Fatalf("bad YAML must not be fatal, got %v", err)
 	}
@@ -96,7 +96,7 @@ hosts:
     address: 1.2.3.4
 `)
 
-	res, err := loadAndMerge(sshPath, mtermPath)
+	res, err := loadAndMerge(sshPath, mtermPath, nil)
 	if err != nil {
 		t.Fatalf("loadAndMerge: %v", err)
 	}
@@ -127,7 +127,7 @@ hosts:
     port: 2222
 `)
 
-	res, err := loadAndMerge(sshPath, mtermPath)
+	res, err := loadAndMerge(sshPath, mtermPath, nil)
 	if err != nil {
 		t.Fatalf("loadAndMerge: %v", err)
 	}
@@ -176,7 +176,7 @@ hosts:
   - {name: alpha, address: a, group: beta}
   - {name: beta, address: b, group: alpha}
 `)
-	res, err := loadAndMerge(sshPath, mtermPath)
+	res, err := loadAndMerge(sshPath, mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestLoadAndMergeBorderColorValid(t *testing.T) {
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := loadAndMerge("", mtermPath)
+	res, err := loadAndMerge("", mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,6 +219,77 @@ func TestLoadAndMergeBorderColorValid(t *testing.T) {
 	}
 }
 
+func TestLoadAndMergeBorderColorResolvesNamedColor(t *testing.T) {
+	// With a non-nil colors map, non-hex bordercolor values resolve
+	// through it. Hex still wins for entries that look hex.
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: prod
+    bordercolor: limegreen
+  - name: staging
+    bordercolor: "Hotpink"
+  - name: literal
+    bordercolor: "#FF3344"
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	colors := map[string]string{
+		"limegreen": "#32CD32",
+		"hotpink":   "#FF69B4",
+	}
+	res, err := loadAndMerge("", mtermPath, colors)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", res.Warnings)
+	}
+	got := map[string]string{}
+	for _, h := range res.Hosts {
+		got[h.Name] = h.BorderColor
+	}
+	want := map[string]string{
+		"prod":    "#32CD32",
+		"staging": "#FF69B4",
+		"literal": "#FF3344",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("BorderColor map = %v, want %v", got, want)
+	}
+}
+
+func TestLoadAndMergeBorderColorUnknownNameWarns(t *testing.T) {
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: badname
+    bordercolor: foobar
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	colors := map[string]string{"limegreen": "#32CD32"}
+	res, err := loadAndMerge("", mtermPath, colors)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Hosts[0].BorderColor != "" {
+		t.Fatalf("unknown name should clear BorderColor; got %q", res.Hosts[0].BorderColor)
+	}
+	if len(res.Warnings) == 0 {
+		t.Fatal("expected a warning for unknown color name")
+	}
+	found := false
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "foobar") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("warning should name the bad value; got %v", res.Warnings)
+	}
+}
+
 func TestLoadAndMergeBorderColorInvalidWarns(t *testing.T) {
 	dir := t.TempDir()
 	mtermPath := filepath.Join(dir, "hosts.yaml")
@@ -228,7 +299,7 @@ func TestLoadAndMergeBorderColorInvalidWarns(t *testing.T) {
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := loadAndMerge("", mtermPath)
+	res, err := loadAndMerge("", mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +337,7 @@ func TestLoadAndMergeUnknownYAMLKeyWarns(t *testing.T) {
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := loadAndMerge("", mtermPath)
+	res, err := loadAndMerge("", mtermPath, nil)
 	if err != nil {
 		t.Fatalf("loadAndMerge: %v", err)
 	}
@@ -300,7 +371,7 @@ func TestLoadAndMergeNameAliases(t *testing.T) {
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := loadAndMerge("", mtermPath)
+	res, err := loadAndMerge("", mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +402,7 @@ func TestLoadAndMergeAddressFallsBackToName(t *testing.T) {
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := loadAndMerge("", mtermPath)
+	res, err := loadAndMerge("", mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +431,7 @@ hosts:
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := loadAndMerge("", mtermPath)
+	res, err := loadAndMerge("", mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +470,7 @@ hosts:
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := loadAndMerge("", mtermPath)
+	res, err := loadAndMerge("", mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,7 +508,7 @@ func TestLoadAndMergeLogTriState(t *testing.T) {
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := loadAndMerge("", mtermPath)
+	res, err := loadAndMerge("", mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -486,7 +557,7 @@ func TestLoadAndMergeNestedGroupsSchema(t *testing.T) {
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := loadAndMerge("", mtermPath)
+	res, err := loadAndMerge("", mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -543,7 +614,7 @@ hosts:
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := loadAndMerge("", mtermPath)
+	res, err := loadAndMerge("", mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -573,7 +644,7 @@ hosts:
     address: 1.1.1.1
     group: Work
 `)
-	res, err := loadAndMerge(sshPath, mtermPath)
+	res, err := loadAndMerge(sshPath, mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -598,7 +669,7 @@ func TestLoadAndMergeNameAliasConflictWarns(t *testing.T) {
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := loadAndMerge("", mtermPath)
+	res, err := loadAndMerge("", mtermPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
