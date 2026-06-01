@@ -340,6 +340,45 @@ func TestLoadAndMergeAddressFallsBackToName(t *testing.T) {
 	}
 }
 
+func TestLoadAndMergeIdentityFileFlowsThrough(t *testing.T) {
+	// `identityfile` set in hosts.yaml must reach config.Host.IdentityFile
+	// in both forms: flat and nested. ssh_config-loaded values also
+	// survive because the merge layer doesn't touch them.
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`groups:
+  - name: Work
+    hosts:
+      - name: nested-host
+        address: 10.0.0.1
+        identityfile: ~/.ssh/work-key
+hosts:
+  - name: flat-host
+    address: 10.0.0.2
+    identityfile: /tmp/explicit-key
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", res.Warnings)
+	}
+	got := map[string]string{}
+	for _, h := range res.Hosts {
+		got[h.Name] = h.IdentityFile
+	}
+	want := map[string]string{
+		"nested-host": "~/.ssh/work-key",
+		"flat-host":   "/tmp/explicit-key",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("IdentityFile map = %v, want %v", got, want)
+	}
+}
+
 func TestLoadAndMergeLogTriState(t *testing.T) {
 	// Default = on (nil Log → Logging() == true).
 	// Explicit log: false → off.

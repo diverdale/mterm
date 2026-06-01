@@ -97,6 +97,7 @@ All fields are optional unless noted. Field names are **lowercase** by conventio
 | `tags`        | []string  | (none)        | Tag list shown in `[…]` brackets next to the host in the picker. |
 | `forwards`    | []Forward | (none)        | Port-forwarding rules. See below. |
 | `bordercolor` | string    | (theme accent)| Hex `#RRGGBB` or `#RGB`. When this host's tab is active, the window frame, active tab chip, footer key hints, and `user@host:port` segment all use this color. Invalid values warn and are ignored. |
+| `identityfile`| string    | (none)        | Path to an SSH private key file. Tried *before* the agent, mimicking `ssh`'s fallback. `~/` and `$HOME` are expanded. Encrypted keys are not supported — load those via `ssh-add --apple-use-keychain` instead. |
 | `log`         | bool      | `true`        | Set `false` to opt out of per-session output logging for this host. |
 
 ### Forward fields
@@ -178,6 +179,7 @@ hosts:
     group: production
     tags: [primary, postgres]
     bordercolor: "#FF3344"
+    identityfile: ~/.ssh/prod-db-key
     log: true
     forwards:
       - type: local

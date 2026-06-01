@@ -44,13 +44,14 @@ type mtermHost struct {
 	Host     string `yaml:"host"`     // alias for Name
 	Address  string `yaml:"address"`  // dial target; empty = DNS-resolve Name
 
-	User        string         `yaml:"user"`
-	Port        int            `yaml:"port"`
-	Group       string         `yaml:"group"`
-	Tags        []string       `yaml:"tags"`
-	Forwards    []mtermForward `yaml:"forwards"`
-	BorderColor string         `yaml:"bordercolor"`
-	Log         *bool          `yaml:"log"` // nil = default-on; false = opt-out
+	User         string         `yaml:"user"`
+	Port         int            `yaml:"port"`
+	Group        string         `yaml:"group"`
+	Tags         []string       `yaml:"tags"`
+	Forwards     []mtermForward `yaml:"forwards"`
+	BorderColor  string         `yaml:"bordercolor"`
+	IdentityFile string         `yaml:"identityfile"` // ~ and $HOME expanded at connect time
+	Log          *bool          `yaml:"log"`          // nil = default-on; false = opt-out
 
 	// intentOrder is the loader-assigned sequence number used to preserve
 	// yaml declaration order during sort. Not a yaml field — set during

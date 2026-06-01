@@ -85,7 +85,19 @@ func run() error {
 		// version routes this through an interactive modal.
 		verifier := mssh.NewHostKeyVerifier(knownHostsPath,
 			func(string, gossh.PublicKey) bool { return true })
-		sess := mssh.NewSession(host, auth, verifier.Callback())
+
+		// Build the per-host auth chain. IdentityFile (from hosts.yaml or
+		// ssh_config) is tried first when set, then the agent — matches
+		// `ssh`'s own fallback order and means a reboot-cleared agent
+		// doesn't break auth when a key is also on disk.
+		providers := []mssh.AuthProvider{}
+		if host.IdentityFile != "" {
+			providers = append(providers, mssh.NewIdentityFileProvider(host.IdentityFile))
+		}
+		providers = append(providers, auth)
+		hostAuth := mssh.ChainProvider(providers...)
+
+		sess := mssh.NewSession(host, hostAuth, verifier.Callback())
 		if err := sess.Connect(cols, rows); err != nil {
 			return nil, err
 		}

@@ -206,6 +206,9 @@ func applyOverlay(h *Host, mh mtermHost) {
 	if mh.BorderColor != "" {
 		h.BorderColor = mh.BorderColor
 	}
+	if mh.IdentityFile != "" {
+		h.IdentityFile = mh.IdentityFile
+	}
 	if mh.Log != nil {
 		h.Log = mh.Log
 	}
@@ -225,16 +228,17 @@ func hostFromMterm(mh mtermHost) Host {
 		forwards = append(forwards, mf.toForward())
 	}
 	return Host{
-		Name:        mh.Name,
-		HostName:    hostName,
-		User:        mh.User,
-		Port:        port,
-		Group:       mh.Group,
-		Tags:        mh.Tags,
-		Source:      SourceMterm,
-		Forwards:    forwards,
-		BorderColor: mh.BorderColor,
-		Log:         mh.Log,
-		intentOrder: mh.intentOrder,
+		Name:         mh.Name,
+		HostName:     hostName,
+		User:         mh.User,
+		Port:         port,
+		Group:        mh.Group,
+		Tags:         mh.Tags,
+		Source:       SourceMterm,
+		Forwards:     forwards,
+		BorderColor:  mh.BorderColor,
+		IdentityFile: mh.IdentityFile,
+		Log:          mh.Log,
+		intentOrder:  mh.intentOrder,
 	}
 }
