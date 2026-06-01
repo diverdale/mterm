@@ -594,7 +594,7 @@ func (a *App) sessionView() string {
 	}
 	s := chromeStylesFor(t.host.BorderColor)
 	off, _ := t.scrollPos()
-	title := s.title.Render(appmeta.Name) + statusCount(len(a.tabs)) + syncCount(len(a.syncTabs)) + scrollIndicator(off)
+	title := s.title.Render(appmeta.Name) + statusCount(len(a.tabs)) + syncCount(len(a.syncTabs)) + scrollIndicator(off) + statusMsgBadge(a.statusMsg)
 	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2, s, a.syncTabs)
 	footer := renderFooter(footerOpts{
 		hints:         []keyHint{{"^B", "menu"}, {"^B n", "next"}, {"^B x", "close"}},
@@ -646,6 +646,23 @@ func scrollIndicator(offset int) string {
 	}
 	return lipgloss.NewStyle().Foreground(active.Warning).Bold(true).
 		Render(fmt.Sprintf("  [scroll %d]", offset))
+}
+
+// statusMsgBadge renders a warning-color " · <msg>" suffix in the title
+// bar so transient feedback (palette command results, log paths, restore
+// summaries, etc.) is visible in session mode — the picker view appends
+// statusMsg to the body, but the session body is the live VT and can't
+// be touched. Truncated to keep the title from blowing out the frame.
+func statusMsgBadge(msg string) string {
+	if msg == "" {
+		return ""
+	}
+	const maxLen = 60
+	runes := []rune(msg)
+	if len(runes) > maxLen {
+		msg = string(runes[:maxLen-1]) + "…"
+	}
+	return lipgloss.NewStyle().Foreground(active.Warning).Render("  · " + msg)
 }
 
 // sessionInfo renders user@host:port for the footer.

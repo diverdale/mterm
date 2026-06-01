@@ -702,6 +702,23 @@ func TestSetActiveMarksSeen(t *testing.T) {
 	}
 }
 
+func TestSessionViewSurfacesStatusMsg(t *testing.T) {
+	// statusMsg set during session mode must appear somewhere in the view —
+	// otherwise palette feedback (workspace results, log paths, errors) is
+	// silently swallowed since the session body is the live VT.
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	app.statusMsg = "workspace \"dev-day\": all hosts already open"
+
+	out := app.View()
+	if !strings.Contains(out, "all hosts already open") {
+		t.Fatalf("session view should contain statusMsg; got:\n%s", out)
+	}
+}
+
 func TestWorkspaceRestoreOpensTabsForKnownHosts(t *testing.T) {
 	app := newTestApp()
 	app.width, app.height = 80, 24
