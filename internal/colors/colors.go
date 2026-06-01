@@ -18,16 +18,16 @@ import (
 func Builtins() map[string]string {
 	return map[string]string{
 		// Reds / pinks
-		"red":       "#FF3344",
-		"darkred":   "#8B0000",
-		"crimson":   "#DC143C",
-		"hotpink":   "#FF69B4",
-		"pink":      "#FFB6C1",
+		"red":     "#FF3344",
+		"darkred": "#8B0000",
+		"crimson": "#DC143C",
+		"hotpink": "#FF69B4",
+		"pink":    "#FFB6C1",
 		// Oranges / yellows
-		"orange":    "#FF8C00",
-		"gold":      "#FFD700",
-		"yellow":    "#FFD93D",
-		"amber":     "#FFB347",
+		"orange": "#FF8C00",
+		"gold":   "#FFD700",
+		"yellow": "#FFD93D",
+		"amber":  "#FFB347",
 		// Greens
 		"green":     "#33CC66",
 		"limegreen": "#32CD32",
@@ -35,24 +35,24 @@ func Builtins() map[string]string {
 		"olive":     "#808000",
 		"teal":      "#008080",
 		// Blues / cyans
-		"blue":      "#3344FF",
-		"navy":      "#000080",
-		"sky":       "#87CEEB",
-		"cyan":      "#00CCDD",
+		"blue": "#3344FF",
+		"navy": "#000080",
+		"sky":  "#87CEEB",
+		"cyan": "#00CCDD",
 		// Purples
-		"purple":    "#8A2BE2",
-		"magenta":   "#F92AAD",
-		"violet":    "#8B5CF6",
+		"purple":  "#8A2BE2",
+		"magenta": "#F92AAD",
+		"violet":  "#8B5CF6",
 		// Neutrals
-		"white":     "#FFFFFF",
-		"gray":      "#808080",
-		"grey":      "#808080",
-		"black":     "#000000",
-		"silver":    "#C0C0C0",
+		"white":  "#FFFFFF",
+		"gray":   "#808080",
+		"grey":   "#808080",
+		"black":  "#000000",
+		"silver": "#C0C0C0",
 		// Common branding-ish picks
-		"prodred":   "#CC0000",
+		"prodred":     "#CC0000",
 		"stageyellow": "#E5C07B",
-		"devgreen":  "#33CC66",
+		"devgreen":    "#33CC66",
 	}
 }
 

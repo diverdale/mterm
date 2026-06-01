@@ -113,7 +113,7 @@ All fields are optional unless noted. Field names are **lowercase** by conventio
 | `group`       | string    | (none)        | Picker group label. Slash-delimited paths nest sub-groups (`Home/Media`, `Work/Project1`). For multi-host hierarchies prefer the structured `groups:` form (see below). |
 | `tags`        | []string  | (none)        | Tag list shown in `[…]` brackets next to the host in the picker. |
 | `forwards`    | []Forward | (none)        | Port-forwarding rules. See below. |
-| `bordercolor` | string    | (theme accent)| Hex `#RRGGBB` or `#RGB`. When this host's tab is active, the window frame, active tab chip, footer key hints, and `user@host:port` segment all use this color. Invalid values warn and are ignored. |
+| `bordercolor` | string    | (theme accent)| Hex `#RRGGBB`/`#RGB` OR a named color (`limegreen`, `hotpink`, `prodred`, `stageyellow`, `devgreen`, plus standard CSS-ish names). Add your own in `~/.config/mterm/colors.yaml`. When this host's tab is active, the window frame, active tab chip, footer key hints, and `user@host:port` segment all use this color. Invalid values warn and are ignored. |
 | `identityfile`| string    | (none)        | Path to an SSH private key file. Tried *before* the agent, mimicking `ssh`'s fallback. `~/` and `$HOME` are expanded. Encrypted keys are not supported — load those via `ssh-add --apple-use-keychain` instead. |
 | `on_connect`  | []string  | (none)        | Shell commands to send to the remote after handshake. Each gets a trailing CR. Common uses: auto-attach to tmux/screen (`tmux new -A -s mterm-$USER`), `cd` into a working dir. |
 | `log`         | bool      | `true`        | Set `false` to opt out of per-session output logging for this host. |
@@ -307,6 +307,7 @@ mterm lives under `~/.config/mterm/`:
 | `~/.config/mterm/logs/<host>/<YYYYMMDD-HHMMSS>.log` | Per-session output logs        |
 | `~/.config/mterm/history.json`                    | Last-connected timestamps per host (powers the picker's "2h ago" decorations) |
 | `~/.config/mterm/workspaces.json`                 | Saved workspaces (named tab sets) |
+| `~/.config/mterm/colors.yaml`                     | User-defined `bordercolor` names (`yaml` map of name → hex, e.g. `myprodred: "#CC0000"`). Merged on top of mterm's built-in palette. |
 
 The directory is created automatically on first run. Logs are raw bytes including ANSI escapes — replay faithfully with `less -R <file>`, or strip ANSI for grep:
 

@@ -523,6 +523,7 @@ func (a *App) View() string {
 	case modeSession:
 		return a.sessionView()
 	case modePalette:
+		a.palette.setSize(a.width, a.height)
 		return lipgloss.Place(a.width, a.height,
 			lipgloss.Center, lipgloss.Center,
 			a.palette.View())
