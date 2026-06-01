@@ -25,7 +25,9 @@ The `~/.config/mterm/` directory is created automatically on first run.
 ## Features
 
 - Tabbed SSH sessions with `^B` prefix navigation (tmux-style)
-- Native Go SSH client + agent auth + lenient `known_hosts`
+- Native Go SSH client — agent auth + per-host `identityfile:` fallback
+  (so a reboot-cleared agent doesn't break connections when the key is
+  on disk), lenient `known_hosts`
 - Full-fidelity VT terminal: cursor, 24-bit color
 - Mouse-wheel scrollback on the active session — scroll up to browse
   history, type any key to snap back to live. Viewport stays anchored to
@@ -67,8 +69,10 @@ The prefix is **`^B`** (Ctrl-B), tmux-style. Press it, then the command key.
 | `^B s`    | toggle the current tab in the broadcast sync set    |
 | `^B :`    | open the command palette                            |
 | `^B ?`    | open the keybinding help overlay                    |
+| `^B D`    | dump every goroutine's stack to `/tmp/mterm-stacks-…` for diagnosis (status line shows the file path) |
 | `^B q`    | quit mterm                                          |
 | `^C`      | passes through to the remote session (SIGINT)       |
+| wheel ↑/↓ | scroll the active tab's scrollback; any key snaps back to live |
 
 In the picker:
 
@@ -233,6 +237,9 @@ groups:
           - name: sao-dev
             address: 10.122.26.36
             user: dale
+            identityfile: ~/.ssh/sao-dev-key   # tried before the agent
+            on_connect:                        # auto-attach a persistent tmux
+              - "tmux new -A -s mterm-dale"
           - name: lab-bastion
             address: 10.122.26.1
             user: dale
@@ -254,6 +261,7 @@ groups:
           - name: plex-ubuntu
             address: 192.168.2.50
             bordercolor: "#FF3344"
+            log: false                         # noisy host; skip session log
           - name: binarr
             address: 192.168.2.12
       - name: Development
@@ -262,6 +270,9 @@ groups:
             address: 192.168.2.20
             user: dale
             tags: [linux, primary]
+            on_connect:
+              - "cd /var/log/app"
+              - "tail -F app.log"              # drops you into a live tail
 
 # Flat overlays for ssh_config entries — no need to nest these.
 hosts:
