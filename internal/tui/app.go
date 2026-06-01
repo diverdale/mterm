@@ -234,6 +234,23 @@ func (a *App) handleKey(k tea.KeyMsg) tea.Cmd {
 		return a.workspaceSave.Update(k)
 	}
 
+	// Direct tab-switch shortcuts. Active only in session mode with >1
+	// tab open so they don't surprise picker/forwards users. Ctrl-Left/
+	// Right are the "what the user asked for" pair (note: they shadow
+	// shell word-jump on the remote — use Option-Left/Right on macOS
+	// for word-jump instead); Ctrl-PgUp/PgDn are the no-conflict iTerm2
+	// / browser convention.
+	if a.mode == modeSession && len(a.tabs) > 1 {
+		switch k.Type {
+		case tea.KeyCtrlLeft, tea.KeyCtrlPgUp:
+			a.cycleTab(-1)
+			return nil
+		case tea.KeyCtrlRight, tea.KeyCtrlPgDown:
+			a.cycleTab(1)
+			return nil
+		}
+	}
+
 	// Prefix state machine is global to picker / session / forwards so
 	// ^B : (palette) and ^B ? (help) work from anywhere.
 	if a.prefixPending {

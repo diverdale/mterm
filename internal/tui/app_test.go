@@ -26,6 +26,66 @@ func TestAppStartsInPickerMode(t *testing.T) {
 	}
 }
 
+func TestAppCtrlArrowsCycleTabsInSession(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.tabs = []*sessionTab{
+		newSessionTab(1, config.Host{Name: "a"}, 80, 24),
+		newSessionTab(2, config.Host{Name: "b"}, 80, 24),
+		newSessionTab(3, config.Host{Name: "c"}, 80, 24),
+	}
+	app.active = 0
+	app.mode = modeSession
+
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlRight})
+	if app.active != 1 {
+		t.Fatalf("ctrl-right: active = %d, want 1", app.active)
+	}
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlLeft})
+	if app.active != 0 {
+		t.Fatalf("ctrl-left: active = %d, want 0", app.active)
+	}
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlPgDown})
+	if app.active != 1 {
+		t.Fatalf("ctrl-pgdn: active = %d, want 1", app.active)
+	}
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlPgUp})
+	if app.active != 0 {
+		t.Fatalf("ctrl-pgup: active = %d, want 0", app.active)
+	}
+}
+
+func TestAppCtrlArrowsNoOpWithSingleTab(t *testing.T) {
+	// One tab: no shortcut should fire — otherwise typing ctrl-arrows in
+	// the remote shell with only one mterm tab open would still get
+	// swallowed by an effectively meaningless "switch."
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	app.mode = modeSession
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlRight})
+	if app.active != 0 {
+		t.Fatalf("single tab: ctrl-right should not change active; got %d", app.active)
+	}
+}
+
+func TestAppCtrlArrowsNoOpInPickerMode(t *testing.T) {
+	// Picker users shouldn't get surprise tab cycling.
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.tabs = []*sessionTab{
+		newSessionTab(1, config.Host{Name: "a"}, 80, 24),
+		newSessionTab(2, config.Host{Name: "b"}, 80, 24),
+	}
+	app.active = 0
+	app.mode = modePicker
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlRight})
+	if app.active != 0 {
+		t.Fatalf("picker mode: ctrl-right should not change active; got %d", app.active)
+	}
+}
+
 func TestAppPrefixThenNextTabSwitchesTab(t *testing.T) {
 	app := newTestApp()
 	app.width, app.height = 80, 24

@@ -43,6 +43,10 @@ var helpSections = []struct {
 		{"^B D", "dump goroutines (diagnostic) → /tmp"},
 		{"^B q", "quit mterm"},
 	}},
+	{"Tab switching (session only)", []kb{
+		{"^← / ^→", "previous / next tab (shadows shell word-jump)"},
+		{"^PgUp / ^PgDn", "previous / next tab (no shell conflict)"},
+	}},
 	{"Picker", []kb{
 		{"type", "filter hosts"},
 		{"↑ / ↓", "move cursor"},

@@ -68,6 +68,8 @@ The prefix is **`^B`** (Ctrl-B), tmux-style. Press it, then the command key.
 | `^B n`    | next tab                                            |
 | `^B p`    | previous tab                                        |
 | `^B 1..9` | jump to tab N                                       |
+| `^←` / `^→`     | previous / next tab in session mode (no prefix needed). Note: shadows shell word-jump on the remote — use Option-Left/Right on macOS for word-jump |
+| `^PgUp` / `^PgDn` | previous / next tab in session mode (no prefix needed; no shell conflict) |
 | `^B x`    | close the current tab                               |
 | `^B f`    | open the port-forwards panel                        |
 | `^B s`    | toggle the current tab in the broadcast sync set    |
