@@ -193,29 +193,46 @@ func showLogPath(a *App) {
 	a.statusMsg = "log: " + p
 }
 
-// restoreWorkspace opens a tab for every host name in the saved set that
-// isn't already open. Missing host names (renamed/removed from hosts.yaml
-// since save time) surface as a single comma-joined statusMsg warning so
-// the user knows the workspace didn't fully restore.
+// restoreWorkspace opens tabs to reach the workspace's per-host count,
+// preserving multiplicity from the saved list (e.g. three "sys-dev"
+// entries → three sys-dev tabs after restore).
+//
+// Semantics are additive: each saved occurrence is satisfied by an existing
+// tab when available, otherwise a fresh tab is opened. Existing tabs beyond
+// the workspace's count for that host are left alone — restore never closes
+// anything. Missing hosts (renamed/removed from hosts.yaml since save)
+// surface as a single comma-joined statusMsg warning.
+//
+// Walks hostNames in saved order so visual tab ordering matches what the
+// user captured.
 func restoreWorkspace(a *App, name string, hostNames []string) tea.Cmd {
-	openByName := map[string]bool{}
+	openCount := map[string]int{}
 	for _, t := range a.tabs {
-		openByName[t.host.Name] = true
+		openCount[t.host.Name]++
 	}
 	byName := map[string]config.Host{}
 	for _, h := range a.picker.all {
 		byName[h.Name] = h
 	}
+	seenInWs := map[string]int{}
+	seenMissing := map[string]bool{}
 	var cmds []tea.Cmd
 	var missing []string
 	opened := 0
 	for _, hn := range hostNames {
-		if openByName[hn] {
+		seenInWs[hn]++
+		// First openCount[hn] occurrences of this host are covered by
+		// the tabs that are already open; only later occurrences need
+		// a fresh tab.
+		if seenInWs[hn] <= openCount[hn] {
 			continue
 		}
 		host, ok := byName[hn]
 		if !ok {
-			missing = append(missing, hn)
+			if !seenMissing[hn] {
+				missing = append(missing, hn)
+				seenMissing[hn] = true
+			}
 			continue
 		}
 		if cmd := a.openTab(host); cmd != nil {
@@ -231,9 +248,9 @@ func restoreWorkspace(a *App, name string, hostNames []string) tea.Cmd {
 		a.statusMsg = fmt.Sprintf("workspace %q: nothing opened (missing: %s)",
 			name, strings.Join(missing, ", "))
 	case opened > 0:
-		a.statusMsg = fmt.Sprintf("workspace restored: %s (%d tabs)", name, opened)
+		a.statusMsg = fmt.Sprintf("workspace restored: %s (%d new tabs)", name, opened)
 	default:
-		a.statusMsg = fmt.Sprintf("workspace %q: all hosts already open", name)
+		a.statusMsg = fmt.Sprintf("workspace %q: already satisfied", name)
 	}
 	return tea.Batch(cmds...)
 }

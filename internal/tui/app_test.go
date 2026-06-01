@@ -733,7 +733,9 @@ func TestWorkspaceRestoreOpensTabsForKnownHosts(t *testing.T) {
 	}
 }
 
-func TestWorkspaceRestoreSkipsAlreadyOpenHosts(t *testing.T) {
+func TestWorkspaceRestoreSatisfiesExistingTabs(t *testing.T) {
+	// Workspace asks for one sys-dev; user already has one open. Restore
+	// is satisfied — no new tab, no destructive close.
 	app := newTestApp()
 	app.width, app.height = 80, 24
 	host := sampleHosts()[0]
@@ -742,8 +744,41 @@ func TestWorkspaceRestoreSkipsAlreadyOpenHosts(t *testing.T) {
 	if len(app.tabs) != 1 {
 		t.Fatalf("should not open a duplicate tab; got %d tabs", len(app.tabs))
 	}
-	if !strings.Contains(app.statusMsg, "already open") {
-		t.Fatalf("statusMsg = %q, want 'already open' notice", app.statusMsg)
+	if !strings.Contains(app.statusMsg, "already satisfied") {
+		t.Fatalf("statusMsg = %q, want 'already satisfied' notice", app.statusMsg)
+	}
+}
+
+func TestWorkspaceRestoreHonorsDuplicateCounts(t *testing.T) {
+	// Workspace asks for three sys-dev tabs; user has one open. Restore
+	// opens two more to reach the saved count.
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	host := sampleHosts()[0]
+	app.tabs = []*sessionTab{newSessionTab(1, host, 80, 24)}
+	restoreWorkspace(app, "triple", []string{host.Name, host.Name, host.Name})
+	if got := len(app.tabs); got != 3 {
+		t.Fatalf("expected 3 tabs after restore; got %d", got)
+	}
+	if !strings.Contains(app.statusMsg, "opened 2") && !strings.Contains(app.statusMsg, "2 new tabs") {
+		t.Fatalf("statusMsg should mention 2 new; got %q", app.statusMsg)
+	}
+}
+
+func TestWorkspaceRestoreNeverClosesExtraTabs(t *testing.T) {
+	// User has more sys-dev tabs than the workspace asked for. Restore
+	// must not close anything — additive only.
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	host := sampleHosts()[0]
+	app.tabs = []*sessionTab{
+		newSessionTab(1, host, 80, 24),
+		newSessionTab(2, host, 80, 24),
+		newSessionTab(3, host, 80, 24),
+	}
+	restoreWorkspace(app, "single", []string{host.Name})
+	if got := len(app.tabs); got != 3 {
+		t.Fatalf("restore should never reduce tabs; got %d, want 3", got)
 	}
 }
 
