@@ -118,7 +118,10 @@ func buildCommands(a *App) []command {
 					a.statusMsg = "no tabs to save"
 					return nil
 				}
-				a.prevMode = a.mode
+				// Do NOT touch a.prevMode here — it already holds the
+				// "where we came from before the palette" mode that ^B :
+				// set, and we want cancel/submit to jump straight back
+				// there rather than landing on the now-empty palette.
 				a.workspaceSave = newWorkspaceSaveModel(len(a.tabs))
 				a.mode = modeWorkspaceSave
 				return nil

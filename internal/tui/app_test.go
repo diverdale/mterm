@@ -13,6 +13,7 @@ import (
 	"mterm/internal/appmeta"
 	"mterm/internal/config"
 	mssh "mterm/internal/ssh"
+	"mterm/internal/workspaces"
 )
 
 func newTestApp() *App {
@@ -716,6 +717,69 @@ func TestSessionViewSurfacesStatusMsg(t *testing.T) {
 	out := app.View()
 	if !strings.Contains(out, "all hosts already open") {
 		t.Fatalf("session view should contain statusMsg; got:\n%s", out)
+	}
+}
+
+func TestWorkspaceSaveCancelReturnsToOriginalMode(t *testing.T) {
+	// Regression: opening the save modal via the palette must not clobber
+	// a.prevMode. Esc on the save modal sends workspaceSaveCancelMsg →
+	// a.mode = a.prevMode → user lands at whatever they were doing before
+	// they ever opened the palette (here: session mode), NOT back at the
+	// palette they already chose from.
+	app := newTestApp()
+	app.mode = modeSession
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	app.prevMode = modeSession // what ^B : would have set
+	app.mode = modeWorkspaceSave
+	app.workspaceSave = newWorkspaceSaveModel(1)
+
+	cmd := app.update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd == nil {
+		t.Fatal("Esc in workspaceSave should return a cmd")
+	}
+	app.update(cmd())
+	if app.mode != modeSession {
+		t.Fatalf("after Esc cancel, mode = %v, want modeSession", app.mode)
+	}
+}
+
+func TestWorkspaceSaveCommandPreservesPrevMode(t *testing.T) {
+	// Regression: the "Save current tabs as workspace…" palette action
+	// must NOT overwrite a.prevMode. Before the fix it did
+	// a.prevMode = a.mode while a.mode was modePalette, which made later
+	// cancel/close try to "go back" to the palette and stick the user
+	// in a loop.
+	store, err := workspaces.Open(t.TempDir() + "/w.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := newTestApp()
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	app.SetWorkspaces(store)
+
+	// Pretend the user opened the palette from session mode.
+	app.prevMode = modeSession
+	app.mode = modePalette
+
+	var saveAction func(a *App) tea.Cmd
+	for _, c := range buildCommands(app) {
+		if strings.HasPrefix(c.label, "Save current tabs") {
+			saveAction = c.action
+			break
+		}
+	}
+	if saveAction == nil {
+		t.Fatal("save command missing from palette build")
+	}
+	saveAction(app)
+
+	if app.mode != modeWorkspaceSave {
+		t.Fatalf("after action, mode = %v, want modeWorkspaceSave", app.mode)
+	}
+	if app.prevMode != modeSession {
+		t.Fatalf("prevMode clobbered: got %v, want modeSession", app.prevMode)
 	}
 }
 
