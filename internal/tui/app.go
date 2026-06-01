@@ -13,6 +13,7 @@ import (
 	"mterm/internal/history"
 	"mterm/internal/sessionlog"
 	mssh "mterm/internal/ssh"
+	"mterm/internal/workspaces"
 )
 
 // viewMode is the current top-level view.
@@ -24,6 +25,7 @@ const (
 	modeForwards
 	modePalette
 	modeHelp
+	modeWorkspaceSave
 )
 
 // renderInterval is the coalesced redraw cadence (~30 fps).
@@ -50,14 +52,15 @@ type App struct {
 	mode          viewMode
 	prefixPending bool
 
-	picker   *picker
-	forwards *forwardsPanel
-	palette  *paletteModel
-	help     *helpModel
-	prevMode viewMode
-	tabs     []*sessionTab
-	active   int
-	nextID   int
+	picker        *picker
+	forwards      *forwardsPanel
+	palette       *paletteModel
+	help          *helpModel
+	workspaceSave *workspaceSaveModel
+	prevMode      viewMode
+	tabs          []*sessionTab
+	active        int
+	nextID        int
 
 	// syncTabs holds the IDs of tabs in the broadcast (sync) set. Keyed by
 	// tab.id (stable across close/reorder, unlike index). When the active
@@ -73,6 +76,10 @@ type App struct {
 	// history tracks the last successful connect time per host. Optional —
 	// nil disables the connection-history decorations in the picker.
 	history *history.Store
+
+	// workspaces persists named tab sets. Optional — nil hides the
+	// workspace commands from the palette.
+	workspaces *workspaces.Store
 }
 
 // NewApp builds the root model.
@@ -113,6 +120,10 @@ func (a *App) SetLogRoot(path string) { a.logRoot = path }
 // SetHistory attaches a connection-history store. nil disables the picker's
 // last-connected decorations and the on-connect record. Call before Run.
 func (a *App) SetHistory(h *history.Store) { a.history = h }
+
+// SetWorkspaces attaches a workspace store. nil hides the workspace
+// commands from the palette. Call before Run.
+func (a *App) SetWorkspaces(w *workspaces.Store) { a.workspaces = w }
 
 // Init starts the render ticker.
 func (a *App) Init() tea.Cmd {
@@ -183,6 +194,27 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 		a.mode = a.prevMode
 		return nil
 
+	case workspaceSaveSubmitMsg:
+		a.mode = a.prevMode
+		if a.workspaces == nil {
+			a.statusMsg = "workspaces store unavailable"
+			return nil
+		}
+		hosts := make([]string, 0, len(a.tabs))
+		for _, t := range a.tabs {
+			hosts = append(hosts, t.host.Name)
+		}
+		if err := a.workspaces.Save(m.name, hosts); err != nil {
+			a.statusMsg = fmt.Sprintf("workspace save: %v", err)
+		} else {
+			a.statusMsg = fmt.Sprintf("workspace saved: %s (%d tabs)", m.name, len(hosts))
+		}
+		return nil
+
+	case workspaceSaveCancelMsg:
+		a.mode = a.prevMode
+		return nil
+
 	case connectedMsg:
 		a.handleConnected(m)
 		return nil
@@ -198,6 +230,8 @@ func (a *App) handleKey(k tea.KeyMsg) tea.Cmd {
 		return a.palette.Update(k)
 	case modeHelp:
 		return a.help.Update(k)
+	case modeWorkspaceSave:
+		return a.workspaceSave.Update(k)
 	}
 
 	// Prefix state machine is global to picker / session / forwards so
@@ -479,6 +513,10 @@ func (a *App) View() string {
 		return lipgloss.Place(a.width, a.height,
 			lipgloss.Center, lipgloss.Center,
 			a.help.View())
+	case modeWorkspaceSave:
+		return lipgloss.Place(a.width, a.height,
+			lipgloss.Center, lipgloss.Center,
+			a.workspaceSave.View())
 	default:
 		return a.pickerView()
 	}

@@ -45,6 +45,16 @@ func HistoryFile() (string, error) {
 	return filepath.Join(dir, "history.json"), nil
 }
 
+// WorkspacesFile returns the path to the workspaces JSON file (map of
+// workspace name → list of host names + saved-at timestamp).
+func WorkspacesFile() (string, error) {
+	dir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "workspaces.json"), nil
+}
+
 // BootstrapConfigDir creates ConfigDir() if it does not yet exist. Idempotent.
 // Called at startup so a fresh install can drop hosts.yaml in place without
 // the user having to mkdir first.

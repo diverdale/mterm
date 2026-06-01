@@ -642,6 +642,46 @@ func TestSetActiveMarksSeen(t *testing.T) {
 	}
 }
 
+func TestWorkspaceRestoreOpensTabsForKnownHosts(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	// newTestApp has nil connector → openTab populates a.tabs but returns
+	// nil; what we care about is the tab side-effect and the status summary.
+	restoreWorkspace(app, "dev-day", []string{sampleHosts()[0].Name})
+	if len(app.tabs) != 1 {
+		t.Fatalf("expected 1 tab opened, got %d", len(app.tabs))
+	}
+	if !strings.HasPrefix(app.statusMsg, "workspace restored:") {
+		t.Fatalf("statusMsg = %q, want a restored summary", app.statusMsg)
+	}
+}
+
+func TestWorkspaceRestoreSkipsAlreadyOpenHosts(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	host := sampleHosts()[0]
+	app.tabs = []*sessionTab{newSessionTab(1, host, 80, 24)}
+	restoreWorkspace(app, "dev-day", []string{host.Name})
+	if len(app.tabs) != 1 {
+		t.Fatalf("should not open a duplicate tab; got %d tabs", len(app.tabs))
+	}
+	if !strings.Contains(app.statusMsg, "already open") {
+		t.Fatalf("statusMsg = %q, want 'already open' notice", app.statusMsg)
+	}
+}
+
+func TestWorkspaceRestoreSurfacesMissingHosts(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	restoreWorkspace(app, "dev-day", []string{"ghost-host"})
+	if len(app.tabs) != 0 {
+		t.Fatalf("missing host should not produce a tab; got %d", len(app.tabs))
+	}
+	if !strings.Contains(app.statusMsg, "ghost-host") {
+		t.Fatalf("statusMsg should name the missing host; got %q", app.statusMsg)
+	}
+}
+
 func TestAppCtrlCPassesThroughToSession(t *testing.T) {
 	// Ctrl-C is the universal "interrupt remote process" signal — mterm
 	// must NOT intercept it. Quit is on the deliberate ^B q two-step.

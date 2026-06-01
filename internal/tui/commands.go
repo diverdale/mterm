@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -106,6 +107,50 @@ func buildCommands(a *App) []command {
 		action: func(a *App) tea.Cmd { showLogPath(a); return nil },
 	})
 
+	// Workspaces — one save command + N restore/delete commands per saved
+	// workspace. Hidden entirely when no store is wired in.
+	if a.workspaces != nil {
+		cmds = append(cmds, command{
+			label: "Save current tabs as workspace…",
+			group: "Workspaces",
+			action: func(a *App) tea.Cmd {
+				if len(a.tabs) == 0 {
+					a.statusMsg = "no tabs to save"
+					return nil
+				}
+				a.prevMode = a.mode
+				a.workspaceSave = newWorkspaceSaveModel(len(a.tabs))
+				a.mode = modeWorkspaceSave
+				return nil
+			},
+		})
+		for _, w := range a.workspaces.List() {
+			name := w.Name
+			hosts := w.Hosts
+			cmds = append(cmds,
+				command{
+					label: fmt.Sprintf("Restore workspace: %s (%d tabs)", name, len(hosts)),
+					group: "Workspaces",
+					action: func(a *App) tea.Cmd {
+						return restoreWorkspace(a, name, hosts)
+					},
+				},
+				command{
+					label: "Delete workspace: " + name,
+					group: "Workspaces",
+					action: func(a *App) tea.Cmd {
+						if err := a.workspaces.Delete(name); err != nil {
+							a.statusMsg = fmt.Sprintf("workspace delete: %v", err)
+						} else {
+							a.statusMsg = "workspace deleted: " + name
+						}
+						return nil
+					},
+				},
+			)
+		}
+	}
+
 	// Broadcast / sync
 	cmds = append(cmds,
 		command{label: "Add active tab to sync set", group: "Broadcast", action: func(a *App) tea.Cmd {
@@ -146,6 +191,51 @@ func showLogPath(a *App) {
 		return
 	}
 	a.statusMsg = "log: " + p
+}
+
+// restoreWorkspace opens a tab for every host name in the saved set that
+// isn't already open. Missing host names (renamed/removed from hosts.yaml
+// since save time) surface as a single comma-joined statusMsg warning so
+// the user knows the workspace didn't fully restore.
+func restoreWorkspace(a *App, name string, hostNames []string) tea.Cmd {
+	openByName := map[string]bool{}
+	for _, t := range a.tabs {
+		openByName[t.host.Name] = true
+	}
+	byName := map[string]config.Host{}
+	for _, h := range a.picker.all {
+		byName[h.Name] = h
+	}
+	var cmds []tea.Cmd
+	var missing []string
+	opened := 0
+	for _, hn := range hostNames {
+		if openByName[hn] {
+			continue
+		}
+		host, ok := byName[hn]
+		if !ok {
+			missing = append(missing, hn)
+			continue
+		}
+		if cmd := a.openTab(host); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		opened++
+	}
+	switch {
+	case len(missing) > 0 && opened > 0:
+		a.statusMsg = fmt.Sprintf("workspace %q: opened %d, missing: %s",
+			name, opened, strings.Join(missing, ", "))
+	case len(missing) > 0:
+		a.statusMsg = fmt.Sprintf("workspace %q: nothing opened (missing: %s)",
+			name, strings.Join(missing, ", "))
+	case opened > 0:
+		a.statusMsg = fmt.Sprintf("workspace restored: %s (%d tabs)", name, opened)
+	default:
+		a.statusMsg = fmt.Sprintf("workspace %q: all hosts already open", name)
+	}
+	return tea.Batch(cmds...)
 }
 
 // reloadHosts re-reads the config files and replaces the picker's host list.

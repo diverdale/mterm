@@ -39,6 +39,10 @@ The `~/.config/mterm/` directory is created automatically on first run.
 - Per-host startup commands — `on_connect: [...]` in hosts.yaml runs
   shell commands right after handshake (auto-attach to tmux/screen,
   jump into a working dir, etc.)
+- Workspaces — save+restore named tab sets via the command palette.
+  "Save current tabs as workspace…" pops a name prompt; "Restore
+  workspace: …" reopens every host in one keystroke; missing hosts
+  surface in the status line. Persisted at `~/.config/mterm/workspaces.json`.
 - Auto-reconnect on transport failure
 - Fuzzy host picker reading `~/.ssh/config` + `~/.config/mterm/hosts.yaml`
   with per-host connection state — `◉` currently in a tab, `●` previously
@@ -300,6 +304,7 @@ mterm lives under `~/.config/mterm/`:
 | `~/.config/mterm/hosts.yaml`                      | Host overlay (this document)     |
 | `~/.config/mterm/logs/<host>/<YYYYMMDD-HHMMSS>.log` | Per-session output logs        |
 | `~/.config/mterm/history.json`                    | Last-connected timestamps per host (powers the picker's "2h ago" decorations) |
+| `~/.config/mterm/workspaces.json`                 | Saved workspaces (named tab sets) |
 
 The directory is created automatically on first run. Logs are raw bytes including ANSI escapes — replay faithfully with `less -R <file>`, or strip ANSI for grep:
 

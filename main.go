@@ -16,6 +16,7 @@ import (
 	"mterm/internal/history"
 	mssh "mterm/internal/ssh"
 	"mterm/internal/tui"
+	"mterm/internal/workspaces"
 )
 
 // installGoroutineDumpHandler wires SIGUSR1 to diag.DumpGoroutines. Lets
@@ -113,6 +114,13 @@ func run() error {
 			app.SetHistory(hist)
 		} else {
 			fmt.Fprintln(os.Stderr, appmeta.Name+": warning: history load:", err)
+		}
+	}
+	if wsPath, err := config.WorkspacesFile(); err == nil {
+		if ws, err := workspaces.Open(wsPath); err == nil {
+			app.SetWorkspaces(ws)
+		} else {
+			fmt.Fprintln(os.Stderr, appmeta.Name+": warning: workspaces load:", err)
 		}
 	}
 	p := tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseCellMotion())
