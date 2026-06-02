@@ -70,15 +70,10 @@ func buildCommands(a *App) []command {
 		})
 	}
 
-	// One Connect: entry per known host.
-	for _, h := range a.picker.all {
-		host := h
-		cmds = append(cmds, command{
-			label:  "Connect: " + host.Name,
-			group:  "Connect",
-			action: func(a *App) tea.Cmd { return a.openTab(host) },
-		})
-	}
+	// Connect entries deliberately omitted — the picker (^B c) is the
+	// dedicated UI for opening a connection, and inlining one Connect
+	// entry per host here just drowns the actual actions in a sea of
+	// hostnames.
 
 	// One Theme: entry per available theme.
 	for _, th := range Themes() {

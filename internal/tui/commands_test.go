@@ -17,8 +17,11 @@ func TestBuildCommandsCounts(t *testing.T) {
 	if counts["Navigation"] != 6 {
 		t.Fatalf("Navigation count = %d, want 6", counts["Navigation"])
 	}
-	if counts["Connect"] != len(app.picker.all) {
-		t.Fatalf("Connect count = %d, want %d", counts["Connect"], len(app.picker.all))
+	// Connect entries are intentionally NOT in the palette — the picker
+	// (^B c) is the dedicated UI for opening connections. Counting them
+	// in case a future refactor accidentally reintroduces them.
+	if counts["Connect"] != 0 {
+		t.Fatalf("Connect count = %d, want 0 (handled by picker)", counts["Connect"])
 	}
 	if counts["Theme"] != len(Themes()) {
 		t.Fatalf("Theme count = %d, want %d", counts["Theme"], len(Themes()))

@@ -150,13 +150,6 @@ XL ≈ structural change to the app, multiple branches.
 **Open:** YAML schema; how to express modifier combinations; whether to surface conflicts at startup or lazily.
 **Depends on:** nothing — refactor of existing key dispatch.
 
-### Command palette pare-down
-**What:** Revisit the palette's command set. Today it dumps every "Connect: \<host\>" entry into the same fuzzy list as the actual commands — fine for 5 hosts, unwieldy at 50+, indistinguishable from the action commands at first glance.
-**Why:** As the host list grows, the palette becomes dominated by Connect entries and the real actions (workspaces, theme switches, log path lookup, etc.) get buried. Defeats the "press `^B :` to *do* something" mental model.
-**Size:** S–M
-**Open:** Hide Connect entries by default (open picker for those — that's already its dedicated UI) and surface only "real" commands? Or partition the palette into two sections with a visual divider, or filter modes (`:` for actions, `>` for connect, `?` for workspaces, like VS Code)? Or just demote Connect entries below all actions so they never appear in the first few hits of an empty search? Need to feel each option in practice before picking.
-**Depends on:** nothing — pure UX/render change.
-
 ---
 
 ## Tier 4 — the big bets
