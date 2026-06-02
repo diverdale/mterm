@@ -398,6 +398,49 @@ sudo rm /usr/local/bin/mterm
 pkgutil --forget dev.mterm
 ```
 
+### Debian / Ubuntu / Linux Mint .deb installer
+
+`debian.sh` wraps the cross-compiled Linux binaries into installable
+`.deb` packages — one per architecture. Colleagues install with `apt`
+or `dpkg`; mterm lands at `/usr/bin/mterm` so it's on PATH everywhere.
+
+```bash
+# macOS:  brew install dpkg
+# Linux:  already built in
+./build.sh && ./debian.sh
+```
+
+Output: `dist/mterm_<version>_amd64.deb` and `dist/mterm_<version>_arm64.deb`.
+
+The version string defaults to `git describe`; if there are no tags
+yet, the SHA is prefixed with `0.0.0+` so Debian's version parser
+accepts it. Override either piece via env vars when you ship:
+
+```bash
+DEB_VERSION=1.0.0 \
+DEB_MAINTAINER="Your Name <you@example.com>" \
+    ./debian.sh
+```
+
+Colleagues install:
+
+```bash
+sudo apt install ./mterm_<version>_amd64.deb   # or _arm64
+# or, equivalently with plain dpkg (no auto-deps; mterm has none):
+sudo dpkg -i mterm_<version>_amd64.deb
+```
+
+Uninstall:
+
+```bash
+sudo apt remove mterm    # or: sudo dpkg -r mterm
+```
+
+The .deb is not signed — for internal distribution this is fine, and
+the `SHA256SUMS` file in `dist/` covers integrity verification.
+Signing requires a Debian package-signing key and `dpkg-sig`;
+deferred until there's a reason to.
+
 ## License
 
 TBD.
