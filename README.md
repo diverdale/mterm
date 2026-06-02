@@ -113,7 +113,7 @@ All fields are optional unless noted. Field names are **lowercase** by conventio
 | `group`       | string    | (none)        | Picker group label. Slash-delimited paths nest sub-groups (`Home/Media`, `Work/Project1`). For multi-host hierarchies prefer the structured `groups:` form (see below). |
 | `tags`        | []string  | (none)        | Tag list shown in `[…]` brackets next to the host in the picker. |
 | `forwards`    | []Forward | (none)        | Port-forwarding rules. See below. |
-| `bordercolor` | string    | (theme accent)| Hex `#RRGGBB`/`#RGB` OR a named color (`limegreen`, `hotpink`, `prodred`, `stageyellow`, `devgreen`, plus standard CSS-ish names). Add your own in `~/.config/mterm/colors.yaml`. When this host's tab is active, the window frame, active tab chip, footer key hints, and `user@host:port` segment all use this color. Invalid values warn and are ignored. |
+| `bordercolor` | string    | (theme accent)| Hex `#RRGGBB`/`#RGB` OR a named color (see ["Built-in color names"](#built-in-color-names) below). When this host's tab is active, the window frame, active tab chip, footer key hints, and `user@host:port` segment all use this color. Invalid values warn and are ignored. |
 | `identityfile`| string    | (none)        | Path to an SSH private key file. Tried *before* the agent, mimicking `ssh`'s fallback. `~/` and `$HOME` are expanded. Encrypted keys are not supported — load those via `ssh-add --apple-use-keychain` instead. |
 | `on_connect`  | []string  | (none)        | Shell commands to send to the remote after handshake. Each gets a trailing CR. Common uses: auto-attach to tmux/screen (`tmux new -A -s mterm-$USER`), `cd` into a working dir. |
 | `log`         | bool      | `true`        | Set `false` to opt out of per-session output logging for this host. |
@@ -129,6 +129,49 @@ Each entry inside `forwards:`:
 | `bindport` | int    | **required** | Port to listen on. |
 | `dialaddr` | string | **required** | Destination address. |
 | `dialport` | int    | **required** | Destination port. |
+
+### Built-in color names
+
+Names that `bordercolor:` accepts out of the box (case-insensitive). Add or
+override any of them in `~/.config/mterm/colors.yaml`.
+
+| Family    | Names                                                          |
+|-----------|----------------------------------------------------------------|
+| Reds / pinks   | `red` `#FF3344` · `darkred` `#8B0000` · `crimson` `#DC143C` · `hotpink` `#FF69B4` · `pink` `#FFB6C1` |
+| Oranges / yellows | `orange` `#FF8C00` · `gold` `#FFD700` · `yellow` `#FFD93D` · `amber` `#FFB347` |
+| Greens         | `green` `#33CC66` · `limegreen` `#32CD32` · `darkgreen` `#006400` · `olive` `#808000` · `teal` `#008080` |
+| Blues / cyans  | `blue` `#3344FF` · `navy` `#000080` · `sky` `#87CEEB` · `cyan` `#00CCDD` |
+| Purples        | `purple` `#8A2BE2` · `magenta` `#F92AAD` · `violet` `#8B5CF6` |
+| Neutrals       | `white` `#FFFFFF` · `gray` / `grey` `#808080` · `black` `#000000` · `silver` `#C0C0C0` |
+| Environment flags | `prodred` `#CC0000` · `stageyellow` `#E5C07B` · `devgreen` `#33CC66` |
+
+Custom palette example (`~/.config/mterm/colors.yaml`):
+
+```yaml
+# User entries override built-ins of the same name.
+myprodred: "#CC0000"
+slackpurple: "#4A154B"
+msftblue: "#3344FF"
+ciscoblue: "#1BA0D7"
+```
+
+Then in `hosts.yaml`:
+
+```yaml
+hosts:
+  - name: prod-db
+    address: 10.0.0.5
+    bordercolor: msftblue        # resolves through colors.yaml
+  - name: lab-box
+    address: 10.0.0.6
+    bordercolor: limegreen       # built-in
+  - name: stage-db
+    address: 10.0.0.7
+    bordercolor: "#E5C07B"       # hex still works
+```
+
+`^B :` → `Reload config` re-reads both files so edits take effect without
+restarting mterm.
 
 ### Two ways to define hosts
 
