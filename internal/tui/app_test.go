@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -1005,6 +1006,51 @@ func TestReloadHostsKeepsPickerNonNil(t *testing.T) {
 	reloadHosts(app)
 	if app.picker == nil {
 		t.Fatal("picker became nil after reloadHosts")
+	}
+}
+
+func TestReloadHostsResolvesCustomColorNames(t *testing.T) {
+	// Regression: reloadHosts used to call config.Load() (nil colors map),
+	// so any host using a name defined in ~/.config/<app>/colors.yaml
+	// failed validation with "unknown color name". Fix re-reads
+	// colors.yaml on every reload.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	// Set up the config dir with both a custom colors.yaml and a
+	// hosts.yaml that references one of its names.
+	cfgDir := filepath.Join(home, ".config", "mterm")
+	if err := os.MkdirAll(cfgDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "colors.yaml"),
+		[]byte("msftblue: \"#3344FF\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "hosts.yaml"),
+		[]byte("hosts:\n  - name: sao-dev\n    address: 10.0.0.1\n    bordercolor: msftblue\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	app := newTestApp()
+	reloadHosts(app)
+
+	if app.statusMsg != "" {
+		t.Fatalf("expected no reload warnings; got %q", app.statusMsg)
+	}
+	var sao *config.Host
+	for i, h := range app.picker.all {
+		if h.Name == "sao-dev" {
+			sao = &app.picker.all[i]
+			break
+		}
+	}
+	if sao == nil {
+		t.Fatalf("sao-dev not in reloaded host list: %+v", app.picker.all)
+	}
+	if sao.BorderColor != "#3344FF" {
+		t.Fatalf("BorderColor = %q, want #3344FF (resolved from msftblue)",
+			sao.BorderColor)
 	}
 }
 

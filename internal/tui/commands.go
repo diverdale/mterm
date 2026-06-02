@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"mterm/internal/appmeta"
+	"mterm/internal/colors"
 	"mterm/internal/config"
 )
 
@@ -254,18 +255,39 @@ func restoreWorkspace(a *App, name string, hostNames []string) tea.Cmd {
 }
 
 // reloadHosts re-reads the config files and replaces the picker's host list.
-// Open tabs keep running on their existing SSH connections — only the picker
-// (and the next palette build) sees the change. A successful reload clears
-// any prior transient status message; warnings from config.Load then go to
-// a.statusMsg (last warning wins).
+// Re-reads colors.yaml too so a named bordercolor (e.g. "msftblue") that
+// only exists in the user overlay still resolves after the user edits
+// either file at runtime — without this re-read, the startup colors map
+// stayed in main.go and reload fell back to nil-colors mode, breaking
+// every host that used a custom name.
+//
+// Open tabs keep running on their existing SSH connections — only the
+// picker (and the next palette build) see the change. A successful
+// reload clears any prior transient status message; warnings from
+// config.Load then go to a.statusMsg (last warning wins).
 func reloadHosts(a *App) {
-	res, err := config.Load()
+	var colorMap map[string]string
+	if cpath, err := config.ColorsFile(); err == nil {
+		if m, err := colors.Open(cpath); err == nil {
+			colorMap = m
+		} else {
+			// Surface the colors-file parse error but keep going with
+			// built-ins so reload still functions for hex bordercolors.
+			a.statusMsg = fmt.Sprintf("reload colors: %v", err)
+			colorMap = colors.Builtins()
+		}
+	}
+	res, err := config.LoadWithColors(colorMap)
 	if err != nil {
 		a.statusMsg = fmt.Sprintf("reload: %v", err)
 		return
 	}
 	a.picker = newPicker(res.Hosts)
-	a.statusMsg = ""
+	// Don't blank an existing colors-file warning above; only clear if
+	// nothing was already complaining.
+	if !strings.HasPrefix(a.statusMsg, "reload colors:") {
+		a.statusMsg = ""
+	}
 	for _, w := range res.Warnings {
 		a.statusMsg = w
 	}
