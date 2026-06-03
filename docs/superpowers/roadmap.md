@@ -10,6 +10,17 @@ XL ≈ structural change to the app, multiple branches.
 
 ---
 
+## Next session (2026-06-04)
+
+**→ Clipboard copy mode (tmux-style).** Mouse-drag selection in the terminal
+grabs mterm's frame chars (`│`, `╭`, etc.) along with the session bytes —
+the chrome bleeds into the clipboard. Add `^B [` to enter a keyboard-driven
+copy mode that pushes the selection straight to the system clipboard via
+OSC 52 (with `pbcopy` / `xclip` / `wl-copy` fallback). See Tier 1 entry
+below for the full sketch.
+
+---
+
 ## Already shipped
 
 - Tabbed SSH sessions with `^B`-prefix navigation
@@ -36,6 +47,22 @@ XL ≈ structural change to the app, multiple branches.
 ---
 
 ## Tier 1 — table stakes for SecureCRT defectors
+
+### Clipboard copy mode (tmux-style)
+**What:** `^B [` enters a keyboard-driven scrollback navigation mode; mark
+selection with `space` / `v` + cursor movement; `Enter` pushes the bytes
+straight to the system clipboard via OSC 52 (with `pbcopy` / `xclip` /
+`wl-copy` fallback when the host terminal has OSC 52 disabled). `^B ]` or
+`q` exits without copying.
+**Why:** Mouse-drag selection grabs whatever's visually on screen — including
+mterm's frame chars (`│`, `╭`, etc.). A keyboard copy mode bypasses the
+terminal's selection layer entirely and yields exactly the session bytes,
+no chrome.
+**Size:** M
+**Open:** Could share machinery with "Scrollback search" (regex jump inside
+the same mode). Multi-line preservation vs flatten on copy. Whether to
+remember the last selection across re-entries.
+**Depends on:** nothing.
 
 ### Broadcast input (sync mode)
 **What:** Type once, keystrokes go to every tab in the sync set. Toggle membership per tab.
@@ -204,6 +231,7 @@ Ship B first as `auto_multiplex: tmux` (per host) for cheap wins; revisit A late
 
 Roughly ordered by dependency + effort + bang-for-buck. Each is its own branch.
 
+0. **Clipboard copy mode (tmux-style)** (M) — next-up; fixes the chrome-in-clipboard papercut
 1. **Per-host visual identity** (S) — tiny diff, big safety, no deps
 2. **Connection groups in picker** (S) — finishes earlier deferred work
 3. **Per-session logging** (S–M) — unblocks trigger "log to file"
