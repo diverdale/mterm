@@ -105,6 +105,76 @@ In the command palette:
 | Enter    | run                   |
 | Esc      | cancel                |
 
+## File browser (`^B u`)
+
+A two-pane SFTP browser for the active session — left pane is your local
+filesystem, right pane is the remote. Copies are direction-implicit: the
+**active pane is the source**, the other pane is the destination. So
+local-active → `F5` uploads; remote-active → `F5` downloads.
+
+Layout:
+
+```
+╭─ mterm  [1 tabs] ─────────────────────────────────────────────────╮
+│ [ ● 1 sys-dev ]                                                   │
+├───────────────────────────────────────────────────────────────────┤
+│ ▶ LOCAL                              REMOTE: sys-dev              │
+│   /Users/dalwrigh/Desktop            /home/dale                   │
+│   ─────────                          ─────────                    │
+│   ▸ ..                               ▸ ..                         │
+│   ▸ Documents/                       ▸ work/                      │
+│   ▸ Downloads/                       ▸ .config/                   │
+│ ▶ screenshot.png       142.3 KB        notes.md           2.1 KB  │
+│   readme.md             4.6 KB         todo.txt            612 B  │
+│   notes.txt             1.3 KB                                    │
+│                                                                   │
+│  transferring screenshot.png: 47% · 67.3 / 142.3 KB · 18.4 KB/s   │
+├───────────────────────────────────────────────────────────────────┤
+│ Tab switch · F5 copy · r refresh · Esc close       dale@sys-dev:22│
+╰───────────────────────────────────────────────────────────────────╯
+```
+
+### Controls
+
+| Key            | Action |
+|----------------|--------|
+| `Tab`          | switch active pane (left ↔ right) |
+| `↑` / `↓` or `j` / `k` | move cursor in the active pane |
+| `Enter` / `→` / `l`    | descend into the highlighted directory; `..` goes up |
+| `Backspace` / `←` / `h` | go up to the parent directory |
+| `F5` or `c`    | copy highlighted file from active pane → other pane (with live progress) |
+| `Esc`          | cancel an in-flight transfer; otherwise close the browser |
+| `r`            | refresh both panes |
+| `.`            | toggle hidden files (filenames starting with `.`) |
+
+### Behavior
+
+- **Initial paths.** Local starts at the directory mterm was launched
+  from (`$PWD`); remote starts at the SFTP working directory of the
+  session (typically `$HOME`).
+- **Sort.** Directories first (alphabetical), then files (alphabetical,
+  case-insensitive). `..` is always pinned at the top of each list.
+- **Progress.** During a copy, the status line at the bottom of the
+  browser updates every 200 ms with percent, bytes transferred / total,
+  and transfer rate. Press `Esc` to cancel cleanly — the partial file
+  on the destination is left in place (no auto-rollback in v1; remove
+  it manually if needed).
+- **Errors.** SFTP errors (permission denied, file not found, broken
+  pipes) surface as a one-line status. Browse around the panes to
+  clear the message; the next successful listing erases it.
+- **Hidden files.** Off by default — dotfiles are filtered out of both
+  panes. Toggle with `.` and the panes re-list immediately.
+- **Concurrency.** A single transfer at a time per browser. While one
+  is running, `F5` is ignored until it completes or you cancel.
+
+### Not yet shipped (deferred to follow-on iterations)
+
+`F6` rename, `F7` mkdir, `F8` delete (with confirmation), multi-select
+with `Insert`/`Space`, view-file (pipe through `less`), edit-file,
+sort/filter modes, drag-and-drop from the host terminal. None are
+hard to add — each is a small standalone branch when the demand
+shows up.
+
 ## hosts.yaml reference
 
 All fields are optional unless noted. Field names are **lowercase** by convention; unknown or wrong-cased keys surface as startup warnings rather than being silently dropped.
