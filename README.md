@@ -48,7 +48,11 @@ The `~/.config/mterm/` directory is created automatically on first run.
   with per-host connection state — `◉` currently in a tab, `●` previously
   connected (with "5m ago" / "2h ago" / "3d ago" relative time), `○` never
   connected; group headers show counts (`▸ HOME (3)`)
-- Themable UI (Midnight / Matrix / Synthwave) with frame, tab strip, footer
+- Themable UI — built-in themes (Midnight / Matrix / Synthwave) plus
+  user-defined themes via `~/.config/mterm/themes.yaml`. Switch from the
+  command palette
+- Six chrome frame styles (rounded / square / thick / double / ascii /
+  minimal) selectable at runtime or pinned via `settings.yaml`
 - Per-host visual identity — `bordercolor:` tints the frame, active tab chip, and footer key hints so prod ≠ staging at a glance
 - Per-session output logging to `~/.config/mterm/logs/<host>/<timestamp>.log` (default on; per-host opt-out)
 - Broadcast input — `^B s` toggles a tab into a sync set; type once, fan to every member
@@ -351,6 +355,8 @@ mterm lives under `~/.config/mterm/`:
 | `~/.config/mterm/history.json`                    | Last-connected timestamps per host (powers the picker's "2h ago" decorations) |
 | `~/.config/mterm/workspaces.json`                 | Saved workspaces (named tab sets) |
 | `~/.config/mterm/colors.yaml`                     | User-defined `bordercolor` names (`yaml` map of name → hex, e.g. `myprodred: "#CC0000"`). Merged on top of mterm's built-in palette. |
+| `~/.config/mterm/themes.yaml`                     | User-defined themes (`yaml` map of theme-name → field map). Unset fields inherit Midnight. Appears in `^B :` → `Theme: <name>`. |
+| `~/.config/mterm/settings.yaml`                   | Global toggles. Today: `frame: rounded\|square\|thick\|double\|ascii\|minimal`. |
 
 The directory is created automatically on first run. Logs are raw bytes including ANSI escapes — replay faithfully with `less -R <file>`, or strip ANSI for grep:
 

@@ -67,39 +67,42 @@ func clampLine(s string, w int) string {
 // sideRow wraps one inner line in left/right border characters. content is
 // clamped to exactly innerWidth, so the row is exactly innerWidth+2 wide.
 func sideRow(content string, innerWidth int, s styleSet) string {
-	bar := s.border.Render("│")
+	bar := s.border.Render(frame.Vertical)
 	return bar + clampLine(content, innerWidth) + bar
 }
 
-// topBorder builds "┌─ title ─────┐" exactly width wide. title is placed
-// as-is; the caller pre-styles it.
+// topBorder builds e.g. "╭─ title ─────╮" exactly width wide; the exact
+// glyphs depend on the active frame style. title is placed as-is; the
+// caller pre-styles it.
 func topBorder(title string, width int, s styleSet) string {
-	prefix := "┌─ "
+	prefix := frame.TopLeft + frame.Horizontal + " "
 	fill := width - lipgloss.Width(prefix) - lipgloss.Width(title) - 2
 	if fill < 0 {
 		fill = 0
 	}
 	line := s.border.Render(prefix) + title +
-		s.border.Render(" "+strings.Repeat("─", fill)+"┐")
+		s.border.Render(" "+strings.Repeat(frame.Horizontal, fill)+frame.TopRight)
 	return ansi.Truncate(line, width, "")
 }
 
-// divider builds "├────────┤" exactly width wide.
+// divider builds e.g. "├────────┤" exactly width wide using the active
+// frame's tee + horizontal glyphs.
 func divider(width int, s styleSet) string {
 	mid := width - 2
 	if mid < 0 {
 		mid = 0
 	}
-	return s.border.Render("├" + strings.Repeat("─", mid) + "┤")
+	return s.border.Render(frame.TeeLeft + strings.Repeat(frame.Horizontal, mid) + frame.TeeRight)
 }
 
-// bottomBorder builds "└────────┘" exactly width wide.
+// bottomBorder builds e.g. "╰────────╯" exactly width wide using the
+// active frame's bottom corners + horizontal glyph.
 func bottomBorder(width int, s styleSet) string {
 	mid := width - 2
 	if mid < 0 {
 		mid = 0
 	}
-	return s.border.Render("└" + strings.Repeat("─", mid) + "┘")
+	return s.border.Render(frame.BottomLeft + strings.Repeat(frame.Horizontal, mid) + frame.BottomRight)
 }
 
 // fitLines splits s into lines and returns exactly want lines: short input is

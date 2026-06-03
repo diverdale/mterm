@@ -349,7 +349,10 @@ func TestAppViewIsFramed(t *testing.T) {
 	if len(lines) != 24 {
 		t.Fatalf("framed picker view has %d lines, want 24", len(lines))
 	}
-	if !strings.Contains(lines[0], "┌") {
+	// Default frame style is "rounded" — check for any of the active
+	// preset's top-left corners so the test doesn't break when users
+	// switch styles via settings.yaml.
+	if !strings.Contains(lines[0], frame.TopLeft) {
 		t.Fatalf("picker view is not framed; line 0 = %q", lines[0])
 	}
 	if !strings.Contains(out, appmeta.Name) {

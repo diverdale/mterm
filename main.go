@@ -87,6 +87,14 @@ func run() error {
 			fmt.Fprintln(os.Stderr, appmeta.Name+": warning: themes load:", err)
 		}
 	}
+
+	// Global toggles (frame style today; more in future cycles) from
+	// ~/.config/<app>/settings.yaml.
+	if spath, err := config.SettingsFile(); err == nil {
+		if err := tui.LoadSettings(spath); err != nil {
+			fmt.Fprintln(os.Stderr, appmeta.Name+": warning: settings load:", err)
+		}
+	}
 	for _, w := range res.Warnings {
 		fmt.Fprintln(os.Stderr, appmeta.Name+": warning:", w)
 	}

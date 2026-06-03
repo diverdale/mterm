@@ -23,8 +23,10 @@ func TestBuildCommandsCounts(t *testing.T) {
 	if counts["Connect"] != 0 {
 		t.Fatalf("Connect count = %d, want 0 (handled by picker)", counts["Connect"])
 	}
-	if counts["Theme"] != len(Themes()) {
-		t.Fatalf("Theme count = %d, want %d", counts["Theme"], len(Themes()))
+	// Theme group covers both "Theme: <name>" and "Frame: <name>" entries.
+	wantThemeGroup := len(Themes()) + len(FrameStyleNames())
+	if counts["Theme"] != wantThemeGroup {
+		t.Fatalf("Theme count = %d, want %d", counts["Theme"], wantThemeGroup)
 	}
 	if counts["Config"] != 1 {
 		t.Fatalf("Config count = %d, want 1", counts["Config"])

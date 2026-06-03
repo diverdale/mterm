@@ -89,6 +89,19 @@ func buildCommands(a *App) []command {
 		})
 	}
 
+	// One Frame: entry per available frame style.
+	for _, name := range FrameStyleNames() {
+		styleName := name
+		cmds = append(cmds, command{
+			label: "Frame: " + styleName,
+			group: "Theme",
+			action: func(a *App) tea.Cmd {
+				SetFrameStyle(styleName)
+				return nil
+			},
+		})
+	}
+
 	// Config
 	cmds = append(cmds, command{
 		label:  "Reload config",
@@ -284,6 +297,12 @@ func reloadHosts(a *App) {
 			SetUserThemes(themes)
 		} else if !strings.HasPrefix(a.statusMsg, "reload colors:") {
 			a.statusMsg = fmt.Sprintf("reload themes: %v", err)
+		}
+	}
+	// And settings.yaml — frame style (and future global toggles).
+	if spath, err := config.SettingsFile(); err == nil {
+		if err := LoadSettings(spath); err != nil && a.statusMsg == "" {
+			a.statusMsg = fmt.Sprintf("reload settings: %v", err)
 		}
 	}
 	res, err := config.LoadWithColors(colorMap)
