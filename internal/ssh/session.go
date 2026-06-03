@@ -55,6 +55,7 @@ type Session struct {
 	stdin    io.WriteCloser
 	stdout   io.Reader
 	forwards []*PortForward // active port forwards, stopped on Close
+	sftpCache sftpState // lazily-opened SFTP client; see sftp.go
 
 	closed bool // true once the user called Close
 }
@@ -225,6 +226,7 @@ func (s *Session) Close() error {
 	for _, pf := range forwards {
 		pf.Stop()
 	}
+	s.closeSFTP()
 	if sess != nil {
 		sess.Close()
 	}
