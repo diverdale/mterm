@@ -97,6 +97,13 @@ XL ≈ structural change to the app, multiple branches.
 **Open:** Variable interpolation (`{{host}}`, prompted vars); multi-line sequencing with wait-for-prompt.
 **Depends on:** command palette (already shipped) — same UI pattern.
 
+### Live host monitor panel
+**What:** Optional split-pane panel showing the active host's CPU, memory, disk, load, network throughput, and top processes in real time, alongside the shell. Sparkline history for CPU/network, bar gauges for disk/memory, list of top-N processes by CPU/mem. Toggle with a prefix key (e.g. `^B m` — well, `m` is unused but watch the keymap, maybe `^B M`).
+**Why:** "Operational dashboard with a shell inside it" — sees what the box is doing without leaving the SSH session or installing a remote agent. Inspired by essh's host monitor, which is its single biggest differentiator vs every other multiplexer in the category. If mterm wants to compete head-on with essh on operator-tool feel, this is the gap to close.
+**Size:** L
+**Open:** Collection strategy — periodic `top -bn1` / `vmstat` / `/proc/stat` reads over an SSH exec channel (no remote agent), parsed per-distro (Linux flavors differ enough that a small adapter layer is needed; macOS targets would need a separate path). Cadence (1s? 5s? configurable?). Where the panel lives (right side / bottom?) — interacts with future pane splitting. Caching when the session is backgrounded. Whether to also probe network round-trip from the local side.
+**Depends on:** nothing strictly, but composes with pane splitting (Tier 4) for the cleanest layout.
+
 ### Left sidebar — persistent windows list
 **What:** Replace (or augment) the top tabstrip with a tall left-edge sidebar showing all open tabs as chips with host + status + connection age. tmux's `^B s` window-list, but always visible. Body shrinks; you always see what else is running.
 **Why:** Once you're juggling 4+ sessions the horizontal tabstrip becomes the limiting factor. A vertical sidebar scales to N tabs comfortably and surfaces inactive-tab state (activity, silence, sync membership) without cycling.
