@@ -89,7 +89,7 @@ Section: utils
 Priority: optional
 Architecture: ${debArch}
 Maintainer: ${MAINTAINER}
-Homepage: https://github.com/dalwrigh/mterm
+Homepage: https://github.com/diverdale/mterm
 Description: Multi-connection SSH TUI
  mterm is a Go-powered multi-connection SSH TUI with tabbed SSH
  sessions, a fuzzy host picker, full-fidelity VT terminal, and
