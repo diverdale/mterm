@@ -38,6 +38,7 @@ var helpSections = []struct {
 		{"^B x", "close current tab"},
 		{"^B f", "open forwards panel"},
 		{"^B s", "toggle tab in broadcast sync set"},
+		{"^B u", "open file browser (sftp upload/download)"},
 		{"^B :", "open command palette"},
 		{"^B ?", "this help"},
 		{"^B D", "dump goroutines (diagnostic) → /tmp"},

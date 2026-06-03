@@ -65,7 +65,14 @@ XL ≈ structural change to the app, multiple branches.
 **Open:** Multi-hop chains (rare) vs single hop (covers ~95%).
 **Depends on:** nothing. `golang.org/x/crypto/ssh` supports Dial-over-conn already.
 
-### File transfer (SFTP)
+### File transfer (SFTP) ✓ shipped
+Two-pane file browser via `^B u`. Live progress + cancel during copies.
+Local pane reads `os.ReadDir`; remote pane reads via `sftp.Client`. F5
+copies the highlighted entry from active pane to the other. Hidden files
+toggled with `.`; refresh with `r`. Future iterations may add mkdir,
+delete, rename, multi-select, edit, and view-file.
+
+### File transfer (SFTP) — original entry
 **What:** `^B u` upload, `^B d` download, tiny TUI file browser. SFTP over the existing SSH conn.
 **Why:** SecureCRT users live in SFTP.
 **Size:** L

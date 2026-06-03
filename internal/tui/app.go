@@ -26,6 +26,7 @@ const (
 	modePalette
 	modeHelp
 	modeWorkspaceSave
+	modeFileBrowser
 )
 
 // renderInterval is the coalesced redraw cadence (~30 fps).
@@ -57,6 +58,7 @@ type App struct {
 	palette       *paletteModel
 	help          *helpModel
 	workspaceSave *workspaceSaveModel
+	fileBrowser   *fileBrowserModel
 	prevMode      viewMode
 	tabs          []*sessionTab
 	active        int
@@ -215,6 +217,47 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 		a.mode = a.prevMode
 		return nil
 
+	case fileBrowserClosedMsg:
+		a.fileBrowser = nil
+		a.mode = a.prevMode
+		return nil
+
+	case fileBrowserRefreshMsg:
+		if a.fileBrowser == nil {
+			return nil
+		}
+		return tea.Batch(
+			a.fileBrowser.listLocal(a.fileBrowser.localPath),
+			a.fileBrowser.listRemote(a.fileBrowser.remotePath),
+		)
+
+	case localListedMsg:
+		if a.fileBrowser != nil {
+			a.fileBrowser.applyLocalListing(m)
+		}
+		return nil
+
+	case remoteListedMsg:
+		if a.fileBrowser != nil {
+			a.fileBrowser.applyRemoteListing(m)
+		}
+		return nil
+
+	case transferProgressTickMsg:
+		// Schedule the next tick as long as a transfer is in progress;
+		// the View() reads the atomic counter on every render so we
+		// don't actually carry data in the tick message itself.
+		if a.fileBrowser == nil || a.fileBrowser.transfer == nil {
+			return nil
+		}
+		return tickTransfer()
+
+	case transferDoneMsg:
+		if a.fileBrowser == nil {
+			return nil
+		}
+		return a.fileBrowser.applyTransferDone(m)
+
 	case connectedMsg:
 		a.handleConnected(m)
 		return nil
@@ -232,6 +275,8 @@ func (a *App) handleKey(k tea.KeyMsg) tea.Cmd {
 		return a.help.Update(k)
 	case modeWorkspaceSave:
 		return a.workspaceSave.Update(k)
+	case modeFileBrowser:
+		return a.fileBrowser.Update(k)
 	}
 
 	// Direct tab-switch shortcuts. Active only in session mode with >1
@@ -319,6 +364,14 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 			a.forwards = newForwardsPanel(t.host)
 			a.mode = modeForwards
 		}
+	case "u":
+		if t := a.activeTab(); t != nil {
+			a.prevMode = a.mode
+			a.fileBrowser = newFileBrowserModel(t)
+			a.mode = modeFileBrowser
+			return a.fileBrowser.Init()
+		}
+		a.statusMsg = "open a session first"
 	case "s":
 		a.toggleActiveTabSync()
 	case "D":
@@ -535,6 +588,8 @@ func (a *App) View() string {
 		return lipgloss.Place(a.width, a.height,
 			lipgloss.Center, lipgloss.Center,
 			a.workspaceSave.View())
+	case modeFileBrowser:
+		return a.fileBrowserView()
 	default:
 		return a.pickerView()
 	}
@@ -552,6 +607,46 @@ func fmtUptime(d time.Duration) string {
 // pickerDecorations gathers per-render context the picker uses to render
 // host rows — connection history (from the persisted store) and the set of
 // hosts currently in an open tab (derived from a.tabs in-memory).
+// fileBrowserView frames the active tab's file browser inside the standard
+// window chrome so the visual surface matches every other top-level mode
+// (picker, session, forwards). The file browser model handles its own
+// internal two-pane layout.
+func (a *App) fileBrowserView() string {
+	t := a.activeTab()
+	if t == nil || a.fileBrowser == nil {
+		// Defensive — open path should have rejected this combo.
+		a.mode = a.prevMode
+		return a.View()
+	}
+	// Reserve the same chrome as the session view: top border,
+	// tab strip, divider, [body], divider, footer, bottom border = 6 rows.
+	bodyW := a.width - chromeCols
+	bodyH := a.height - chromeRows
+	if bodyW < 10 {
+		bodyW = 10
+	}
+	if bodyH < 5 {
+		bodyH = 5
+	}
+	a.fileBrowser.setSize(bodyW, bodyH)
+	s := chromeStylesFor(t.host.BorderColor)
+	title := s.title.Render(appmeta.Name) + statusCount(len(a.tabs)) + statusMsgBadge(a.statusMsg)
+	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2, s, a.syncTabs)
+	footer := renderFooter(footerOpts{
+		hints: []keyHint{{"Tab", "switch"}, {"F5", "copy"}, {"r", "refresh"}, {"Esc", "close"}},
+		info:  sessionInfo(t.host),
+		width: a.width - 2,
+	}, s)
+	return renderWindow(windowOpts{
+		title:    title,
+		tabStrip: tabs,
+		body:     a.fileBrowser.View(),
+		footer:   footer,
+		width:    a.width,
+		height:   a.height,
+	}, s)
+}
+
 func (a *App) pickerDecorations() pickerDecorations {
 	deco := pickerDecorations{Now: time.Now()}
 	if a.history != nil {

@@ -39,6 +39,8 @@ The `~/.config/mterm/` directory is created automatically on first run.
 - Per-host startup commands — `on_connect: [...]` in hosts.yaml runs
   shell commands right after handshake (auto-attach to tmux/screen,
   jump into a working dir, etc.)
+- Two-pane SFTP file browser (`^B u`) for upload/download against the
+  active session, with live progress + cancel
 - Workspaces — save+restore named tab sets via the command palette.
   "Save current tabs as workspace…" pops a name prompt; "Restore
   workspace: …" reopens every host in one keystroke; missing hosts
@@ -77,6 +79,7 @@ The prefix is **`^B`** (Ctrl-B), tmux-style. Press it, then the command key.
 | `^B x`    | close the current tab                               |
 | `^B f`    | open the port-forwards panel                        |
 | `^B s`    | toggle the current tab in the broadcast sync set    |
+| `^B u`    | open the two-pane SFTP file browser for the active tab |
 | `^B :`    | open the command palette                            |
 | `^B ?`    | open the keybinding help overlay                    |
 | `^B D`    | dump every goroutine's stack to `/tmp/mterm-stacks-…` for diagnosis (status line shows the file path) |
