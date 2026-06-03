@@ -76,6 +76,17 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	// User-defined themes from ~/.config/<app>/themes.yaml. Built-ins
+	// (Midnight/Matrix/Synthwave) always remain available; user entries
+	// extend the list.
+	if tpath, err := config.ThemesFile(); err == nil {
+		if themes, err := tui.LoadUserThemes(tpath); err == nil {
+			tui.SetUserThemes(themes)
+		} else {
+			fmt.Fprintln(os.Stderr, appmeta.Name+": warning: themes load:", err)
+		}
+	}
 	for _, w := range res.Warnings {
 		fmt.Fprintln(os.Stderr, appmeta.Name+": warning:", w)
 	}

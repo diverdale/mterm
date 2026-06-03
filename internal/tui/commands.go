@@ -277,6 +277,15 @@ func reloadHosts(a *App) {
 			colorMap = colors.Builtins()
 		}
 	}
+	// Re-read user themes the same way — edits to themes.yaml take effect
+	// without restarting mterm.
+	if tpath, err := config.ThemesFile(); err == nil {
+		if themes, err := LoadUserThemes(tpath); err == nil {
+			SetUserThemes(themes)
+		} else if !strings.HasPrefix(a.statusMsg, "reload colors:") {
+			a.statusMsg = fmt.Sprintf("reload themes: %v", err)
+		}
+	}
 	res, err := config.LoadWithColors(colorMap)
 	if err != nil {
 		a.statusMsg = fmt.Sprintf("reload: %v", err)

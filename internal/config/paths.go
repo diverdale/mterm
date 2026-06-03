@@ -65,6 +65,27 @@ func ColorsFile() (string, error) {
 	return filepath.Join(dir, "colors.yaml"), nil
 }
 
+// ThemesFile returns the path to the user theme overlay (yaml map of
+// theme-name → field map). Loaded by tui.LoadUserThemes and merged with
+// the built-in themes.
+func ThemesFile() (string, error) {
+	dir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "themes.yaml"), nil
+}
+
+// SettingsFile returns the path to the global settings yaml (frame style,
+// future toggles like confirm_quit, default theme, etc.).
+func SettingsFile() (string, error) {
+	dir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "settings.yaml"), nil
+}
+
 // BootstrapConfigDir creates ConfigDir() if it does not yet exist. Idempotent.
 // Called at startup so a fresh install can drop hosts.yaml in place without
 // the user having to mkdir first.
