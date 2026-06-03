@@ -15,7 +15,7 @@ On first launch mterm reads `~/.ssh/config` for your existing host aliases and l
 hosts:
   - name: prod-db
     address: 10.0.0.5
-    user: dale
+    user: alice
     group: production
     bordercolor: "#FF3344"
 ```
@@ -115,23 +115,23 @@ local-active → `F5` uploads; remote-active → `F5` downloads.
 Layout:
 
 ```
-╭─ mterm  [1 tabs] ─────────────────────────────────────────────────╮
-│ [ ● 1 sys-dev ]                                                   │
-├───────────────────────────────────────────────────────────────────┤
-│ ▶ LOCAL                              REMOTE: sys-dev              │
-│   /Users/dalwrigh/Desktop            /home/dale                   │
-│   ─────────                          ─────────                    │
-│   ▸ ..                               ▸ ..                         │
-│   ▸ Documents/                       ▸ work/                      │
-│   ▸ Downloads/                       ▸ .config/                   │
-│ ▶ screenshot.png       142.3 KB        notes.md           2.1 KB  │
-│   readme.md             4.6 KB         todo.txt            612 B  │
-│   notes.txt             1.3 KB                                    │
-│                                                                   │
-│  transferring screenshot.png: 47% · 67.3 / 142.3 KB · 18.4 KB/s   │
-├───────────────────────────────────────────────────────────────────┤
-│ Tab switch · F5 copy · r refresh · Esc close       dale@sys-dev:22│
-╰───────────────────────────────────────────────────────────────────╯
+╭─ mterm  [1 tabs] ──────────────────────────────────────────────────────╮
+│ [ ● 1 home-server ]                                                    │
+├────────────────────────────────────────────────────────────────────────┤
+│ ▶ LOCAL                              REMOTE: home-server               │
+│   /Users/alice/Desktop               /home/alice                       │
+│   ─────────                          ─────────                         │
+│   ▸ ..                               ▸ ..                              │
+│   ▸ Documents/                       ▸ work/                           │
+│   ▸ Downloads/                       ▸ .config/                        │
+│ ▶ screenshot.png       142.3 KB        notes.md           2.1 KB       │
+│   readme.md             4.6 KB         todo.txt            612 B       │
+│   notes.txt             1.3 KB                                         │
+│                                                                        │
+│  transferring screenshot.png: 47% · 67.3 / 142.3 KB · 18.4 KB/s        │
+├────────────────────────────────────────────────────────────────────────┤
+│ Tab switch · F5 copy · r refresh · Esc close       alice@home-server:22│
+╰────────────────────────────────────────────────────────────────────────╯
 ```
 
 ### Controls
@@ -228,8 +228,8 @@ Custom palette example (`~/.config/mterm/colors.yaml`):
 # User entries override built-ins of the same name.
 myprodred: "#CC0000"
 slackpurple: "#4A154B"
-msftblue: "#3344FF"
-ciscoblue: "#1BA0D7"
+corpblue: "#3344FF"
+vendorblue: "#1BA0D7"
 ```
 
 Then in `hosts.yaml`:
@@ -238,7 +238,7 @@ Then in `hosts.yaml`:
 hosts:
   - name: prod-db
     address: 10.0.0.5
-    bordercolor: msftblue        # resolves through colors.yaml
+    bordercolor: corpblue        # resolves through colors.yaml
   - name: lab-box
     address: 10.0.0.6
     bordercolor: limegreen       # built-in
@@ -347,30 +347,30 @@ groups:
     groups:
       - name: Lab
         hosts:
-          - name: sao-dev
-            address: 10.122.26.36
-            user: dale
+          - name: lab-host-01
+            address: 198.51.100.36
+            user: alice
             log: false
-      - name: MSFT
+      - name: Vendors
         hosts:
-          - name: msft-optical-1
-            address: 10.122.161.81
+          - name: vendor-switch-01
+            address: 198.51.100.81
             user: administrator
 
   - name: Home
     groups:
       - name: Media
         hosts:
-          - name: plex-ubuntu
-            address: 192.168.2.50
+          - name: media-server
+            address: 192.168.1.50
             bordercolor: "#FF3344"
-          - name: binarr
-            address: 192.168.2.12
+          - name: arr-stack
+            address: 192.168.1.12
       - name: Development
         hosts:
-          - name: sys-dev
-            address: 192.168.2.20
-            user: dale
+          - name: home-server
+            address: 192.168.1.20
+            user: alice
 ```
 
 Hosts inherit their slash-delimited group path from their position in the
@@ -385,7 +385,7 @@ hosts:
   # Pure mterm host with every field shown.
   - name: prod-db-01
     address: 10.0.0.5
-    user: dale
+    user: alice
     port: 22
     group: production
     tags: [primary, postgres]
@@ -433,41 +433,41 @@ groups:
     groups:
       - name: Lab
         hosts:
-          - name: sao-dev
-            address: 10.122.26.36
-            user: dale
-            identityfile: ~/.ssh/sao-dev-key   # tried before the agent
+          - name: lab-host-01
+            address: 198.51.100.36
+            user: alice
+            identityfile: ~/.ssh/lab-host-key  # tried before the agent
             on_connect:                        # auto-attach a persistent tmux
-              - "tmux new -A -s mterm-dale"
+              - "tmux new -A -s mterm-$USER"
           - name: lab-bastion
-            address: 10.122.26.1
-            user: dale
+            address: 198.51.100.1
+            user: alice
             forwards:
               - type: local
                 bindport: 8080
                 dialaddr: 127.0.0.1
                 dialport: 80
-      - name: MSFT
+      - name: Vendors
         hosts:
-          - name: msft-optical-1
-            address: 10.122.161.81
+          - name: vendor-switch-01
+            address: 198.51.100.81
             user: administrator
 
   - name: Home
     groups:
       - name: Media
         hosts:
-          - name: plex-ubuntu
-            address: 192.168.2.50
+          - name: media-server
+            address: 192.168.1.50
             bordercolor: "#FF3344"
             log: false                         # noisy host; skip session log
-          - name: binarr
-            address: 192.168.2.12
+          - name: arr-stack
+            address: 192.168.1.12
       - name: Development
         hosts:
-          - name: sys-dev
-            address: 192.168.2.20
-            user: dale
+          - name: home-server
+            address: 192.168.1.20
+            user: alice
             tags: [linux, primary]
             on_connect:
               - "cd /var/log/app"
