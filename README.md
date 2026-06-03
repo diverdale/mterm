@@ -177,6 +177,79 @@ hosts:
 `^B :` → `Reload config` re-reads both files so edits take effect without
 restarting mterm.
 
+### Custom themes (themes.yaml)
+
+mterm ships three built-in themes — `midnight` (default), `matrix`,
+`synthwave` — switchable from `^B :` → `Theme: <name>`. Add your own in
+`~/.config/mterm/themes.yaml`; they appear in the palette alongside the
+built-ins and survive across runs.
+
+A theme is a flat map of seven color slots. Each is a hex string (`#RRGGBB`
+or `#RGB`). **All slots are optional** — unset fields inherit the value
+from `midnight`, so partial themes like "just darken the frame" work
+cleanly without copying the whole palette.
+
+| Slot        | What it tints |
+|-------------|----------------|
+| `accent`    | Active tab text, host name in title, focus highlights, palette selection bar background, PREFIX badge background, `^B` keys in the footer |
+| `frame`     | Window borders and dividers |
+| `dim`       | Inactive tab text, secondary text, group headers in the picker, palette command labels |
+| `text`      | Primary foreground (where it's distinct from terminal output) |
+| `warning`   | `[sync N]` / `[scroll N]` / `[restored]` status badges, broadcast sync `*` glyph, tab activity indicator |
+| `error`     | Connection errors, palette validation errors |
+| `connected` | Tab status dot for a connected session, silence indicator on idle background tabs |
+
+Example — a Nord-inspired theme plus a quick partial override:
+
+```yaml
+# ~/.config/mterm/themes.yaml
+nordlike:
+  accent:    "#88C0D0"
+  frame:     "#3B4252"
+  dim:       "#4C566A"
+  text:      "#ECEFF4"
+  warning:   "#EBCB8B"
+  error:     "#BF616A"
+  connected: "#A3BE8C"
+
+just-the-accent:
+  accent: "#FF00FF"
+  # frame/dim/text/warning/error/connected → inherit midnight
+```
+
+Theme names are case-insensitive and trimmed; the palette lists user
+themes alphabetically after the built-ins. Switch at runtime via the
+palette; `^B :` → `Reload config` picks up edits.
+
+### Frame style (settings.yaml)
+
+The chrome borders (window frame, dividers between tab strip / body /
+footer) can be drawn in six different glyph sets. Set the default in
+`~/.config/mterm/settings.yaml`:
+
+```yaml
+frame: rounded   # default — matches the pre-customization look
+```
+
+Six options:
+
+| Name      | Corners + edge sample          | Notes |
+|-----------|--------------------------------|-------|
+| `rounded` | `╭─╮ ├ ┤ ╰─╯`                  | default; soft modern look |
+| `square`  | `┌─┐ ├ ┤ └─┘`                  | sharp corners |
+| `thick`   | `┏━┓ ┣ ┫ ┗━┛`                  | heavy lines — handy for "loud prod" feel |
+| `double`  | `╔═╗ ╠ ╣ ╚═╝`                  | classic two-line |
+| `ascii`   | `+-+ + + +-+`                  | for terminals without box-drawing support |
+| `minimal` | spaces                         | quiet chrome, no visible border |
+
+Switch at runtime from `^B :` → `Frame: <name>`. Unknown names fall back
+to the previous setting and surface as a warning. `^B :` →
+`Reload config` re-reads `settings.yaml`.
+
+`settings.yaml` is also where future global toggles (a confirm-quit
+switch, a default theme name, etc.) will land — single file, room to
+grow.
+
 ### Two ways to define hosts
 
 There are two top-level keys: `hosts:` (a flat list) and `groups:` (a nested
