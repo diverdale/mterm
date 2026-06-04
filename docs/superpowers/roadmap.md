@@ -10,17 +10,6 @@ XL ≈ structural change to the app, multiple branches.
 
 ---
 
-## Next session (2026-06-04)
-
-**→ Clipboard copy mode (tmux-style).** Mouse-drag selection in the terminal
-grabs mterm's frame chars (`│`, `╭`, etc.) along with the session bytes —
-the chrome bleeds into the clipboard. Add `^B [` to enter a keyboard-driven
-copy mode that pushes the selection straight to the system clipboard via
-OSC 52 (with `pbcopy` / `xclip` / `wl-copy` fallback). See Tier 1 entry
-below for the full sketch.
-
----
-
 ## Already shipped
 
 - Tabbed SSH sessions with `^B`-prefix navigation
@@ -43,12 +32,18 @@ below for the full sketch.
 - Command palette (`^B :`) and help overlay (`^B ?`)
 - Port-forwarding plumbing (panel exists; integration deferred)
 - Per-tab session timer, animated status spinner
+- `^B m` minimal-frame toggle — flips chrome to spaces for clipboard-friendly
+  mouse-drag grabs; second press restores the prior style
 
 ---
 
 ## Tier 1 — table stakes for SecureCRT defectors
 
-### Clipboard copy mode (tmux-style)
+### Clipboard copy mode (tmux-style) — DEFERRED pending `^B m` evaluation
+**Status:** The lightweight alternative (`^B m` minimal-frame toggle) shipped
+in v0.1.1. Reassess whether the full keyboard copy mode is still needed
+after a few days of live use; many flows are covered by "flip to minimal,
+drag-select, flip back."
 **What:** `^B [` enters a keyboard-driven scrollback navigation mode; mark
 selection with `space` / `v` + cursor movement; `Enter` pushes the bytes
 straight to the system clipboard via OSC 52 (with `pbcopy` / `xclip` /
@@ -57,7 +52,7 @@ straight to the system clipboard via OSC 52 (with `pbcopy` / `xclip` /
 **Why:** Mouse-drag selection grabs whatever's visually on screen — including
 mterm's frame chars (`│`, `╭`, etc.). A keyboard copy mode bypasses the
 terminal's selection layer entirely and yields exactly the session bytes,
-no chrome.
+no chrome. `^B m` solves ~70%; this is the clean fix if 70% isn't enough.
 **Size:** M
 **Open:** Could share machinery with "Scrollback search" (regex jump inside
 the same mode). Multi-line preservation vs flatten on copy. Whether to
@@ -231,7 +226,7 @@ Ship B first as `auto_multiplex: tmux` (per host) for cheap wins; revisit A late
 
 Roughly ordered by dependency + effort + bang-for-buck. Each is its own branch.
 
-0. **Clipboard copy mode (tmux-style)** (M) — next-up; fixes the chrome-in-clipboard papercut
+0. **Clipboard copy mode (tmux-style)** (M) — deferred; `^B m` toggle covers most cases
 1. **Per-host visual identity** (S) — tiny diff, big safety, no deps
 2. **Connection groups in picker** (S) — finishes earlier deferred work
 3. **Per-session logging** (S–M) — unblocks trigger "log to file"
