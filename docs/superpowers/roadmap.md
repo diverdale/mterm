@@ -120,14 +120,14 @@ delete, rename, multi-select, edit, and view-file.
 **Depends on:** existing Theme abstraction (already shipped).
 
 ### Snippets / send-command palette
-**What:** Saved commands in `~/.config/mterm/snippets.yaml`; `^B m` opens a palette; enter sends to active session. Per-host and global namespaces.
+**What:** Saved commands in `~/.config/mterm/snippets.yaml`; `^B e` (placeholder — `^B m` is now the frame toggle, final letter TBD) opens a palette; enter sends to active session. Per-host and global namespaces.
 **Why:** Stop re-typing `kubectl get pods -A -o wide` and `show ip int brief`.
 **Size:** M
 **Open:** Variable interpolation (`{{host}}`, prompted vars); multi-line sequencing with wait-for-prompt.
 **Depends on:** command palette (already shipped) — same UI pattern.
 
 ### Live host monitor panel
-**What:** Optional split-pane panel showing the active host's CPU, memory, disk, load, network throughput, and top processes in real time, alongside the shell. Sparkline history for CPU/network, bar gauges for disk/memory, list of top-N processes by CPU/mem. Toggle with a prefix key (e.g. `^B m` — well, `m` is unused but watch the keymap, maybe `^B M`).
+**What:** Optional split-pane panel showing the active host's CPU, memory, disk, load, network throughput, and top processes in real time, alongside the shell. Sparkline history for CPU/network, bar gauges for disk/memory, list of top-N processes by CPU/mem. Toggle with a prefix key (placeholder: `^B h` for "host monitor" — pick the final letter when this lands; note `^B m` is now the frame toggle).
 **Why:** "Operational dashboard with a shell inside it" — sees what the box is doing without leaving the SSH session or installing a remote agent. Inspired by essh's host monitor, which is its single biggest differentiator vs every other multiplexer in the category. If mterm wants to compete head-on with essh on operator-tool feel, this is the gap to close.
 **Size:** L
 **Open:** Collection strategy — periodic `top -bn1` / `vmstat` / `/proc/stat` reads over an SSH exec channel (no remote agent), parsed per-distro (Linux flavors differ enough that a small adapter layer is needed; macOS targets would need a separate path). Cadence (1s? 5s? configurable?). Where the panel lives (right side / bottom?) — interacts with future pane splitting. Caching when the session is backgrounded. Whether to also probe network round-trip from the local side.
