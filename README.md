@@ -54,7 +54,8 @@ The `~/.config/mterm/` directory is created automatically on first run.
   user-defined themes via `~/.config/mterm/themes.yaml`. Switch from the
   command palette
 - Six chrome frame styles (rounded / square / thick / double / ascii /
-  minimal) selectable at runtime or pinned via `settings.yaml`
+  minimal) selectable at runtime or pinned via `settings.yaml`; `^B m`
+  toggles to/from minimal for clipboard-friendly grabs
 - Per-host visual identity — `bordercolor:` tints the frame, active tab chip, and footer key hints so prod ≠ staging at a glance
 - Per-session output logging to `~/.config/mterm/logs/<host>/<timestamp>.log` (default on; per-host opt-out)
 - Broadcast input — `^B s` toggles a tab into a sync set; type once, fan to every member
@@ -79,6 +80,7 @@ The prefix is **`^B`** (Ctrl-B), tmux-style. Press it, then the command key.
 | `^B x`    | close the current tab                               |
 | `^B f`    | open the port-forwards panel                        |
 | `^B s`    | toggle the current tab in the broadcast sync set    |
+| `^B m`    | toggle minimal frame ↔ previous style (clipboard-friendly chrome) |
 | `^B u`    | open the two-pane SFTP file browser for the active tab |
 | `^B :`    | open the command palette                            |
 | `^B ?`    | open the keybinding help overlay                    |
@@ -318,6 +320,12 @@ Six options:
 Switch at runtime from `^B :` → `Frame: <name>`. Unknown names fall back
 to the previous setting and surface as a warning. `^B :` →
 `Reload config` re-reads `settings.yaml`.
+
+**Quick toggle:** `^B m` flips between `minimal` and your previously
+active style. Handy when you want to grab a chunk of output with the
+mouse — the frame chars get out of the way, you drag-select, you flip
+back. The footer briefly reports `frame: minimal` / `frame: <prior>` so
+you know which state you're in.
 
 `settings.yaml` is also where future global toggles (a confirm-quit
 switch, a default theme name, etc.) will land — single file, room to

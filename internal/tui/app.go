@@ -374,6 +374,10 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 		a.statusMsg = "open a session first"
 	case "s":
 		a.toggleActiveTabSync()
+	case "m":
+		// Quick toggle to minimal frame for clipboard-friendly grabs.
+		// Second press restores the prior style. Status hint confirms.
+		a.statusMsg = "frame: " + ToggleMinimalFrame()
 	case "D":
 		// Diagnostic: dump every goroutine's stack to /tmp and surface the
 		// path in the footer. Useful when the snapshot worker for one tab

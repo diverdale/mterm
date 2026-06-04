@@ -76,15 +76,51 @@ func FrameStyleNames() []string {
 // Default is "rounded" — matches the pre-customization chrome look.
 var frame = frameStylePresets["rounded"]
 
+// currentFrameName tracks which preset is active. Powers ToggleMinimalFrame
+// and any future "what style am I on" surface (palette ticks, status hints).
+var currentFrameName = "rounded"
+
+// lastNonMinimalFrame is the style ToggleMinimalFrame restores to when
+// flipping out of minimal. Seeded with "rounded" so a user whose
+// settings.yaml pins minimal still gets visible chrome on first toggle.
+var lastNonMinimalFrame = "rounded"
+
 // SetFrameStyle switches the active chrome glyph set. Unknown name is a
 // no-op so a typo in settings.yaml doesn't blank the frame. Returns true
 // when the name resolved, false when it didn't.
 func SetFrameStyle(name string) bool {
-	if fc, ok := resolveFrameStyle(name); ok {
-		frame = fc
-		return true
+	canon, fc, ok := resolveFrameStyleCanon(name)
+	if !ok {
+		return false
 	}
-	return false
+	frame = fc
+	currentFrameName = canon
+	if canon != "minimal" {
+		lastNonMinimalFrame = canon
+	}
+	return true
+}
+
+// CurrentFrameName returns the canonical lowercase name of the active
+// frame style. Empty only if package initialization was skipped.
+func CurrentFrameName() string { return currentFrameName }
+
+// ToggleMinimalFrame flips the active frame between "minimal" and the
+// most recently used non-minimal style. Returns the new active name.
+// Powers the `^B m` clipboard-friendly hotkey.
+func ToggleMinimalFrame() string {
+	if currentFrameName == "minimal" {
+		SetFrameStyle(lastNonMinimalFrame)
+	} else {
+		SetFrameStyle("minimal")
+	}
+	return currentFrameName
+}
+
+func resolveFrameStyleCanon(name string) (string, frameChars, bool) {
+	canon := strings.ToLower(strings.TrimSpace(name))
+	fc, ok := frameStylePresets[canon]
+	return canon, fc, ok
 }
 
 func resolveFrameStyle(name string) (frameChars, bool) {

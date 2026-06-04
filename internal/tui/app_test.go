@@ -111,6 +111,34 @@ func TestAppPrefixThenNextTabSwitchesTab(t *testing.T) {
 	}
 }
 
+func TestAppPrefixMTogglesMinimalFrame(t *testing.T) {
+	t.Cleanup(func() { SetFrameStyle("rounded") })
+
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	app.mode = modeSession
+	SetFrameStyle("rounded")
+
+	// ^B m → minimal
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
+	if got := CurrentFrameName(); got != "minimal" {
+		t.Fatalf("after ^B m, frame = %q, want minimal", got)
+	}
+	if app.statusMsg != "frame: minimal" {
+		t.Fatalf("status = %q, want \"frame: minimal\"", app.statusMsg)
+	}
+
+	// ^B m again → restore to rounded
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
+	if got := CurrentFrameName(); got != "rounded" {
+		t.Fatalf("after second ^B m, frame = %q, want rounded", got)
+	}
+}
+
 func TestAppPlainKeyInSessionModeIsNotACommand(t *testing.T) {
 	app := newTestApp()
 	app.width, app.height = 80, 24

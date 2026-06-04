@@ -78,3 +78,59 @@ func TestLoadSettingsUnknownFrameNameErrors(t *testing.T) {
 		t.Fatal("unknown frame name should return an error")
 	}
 }
+
+func TestToggleMinimalFrameRoundTrips(t *testing.T) {
+	t.Cleanup(func() { SetFrameStyle("rounded") })
+
+	SetFrameStyle("rounded")
+	if got := ToggleMinimalFrame(); got != "minimal" {
+		t.Fatalf("first toggle from rounded → %q, want minimal", got)
+	}
+	if frame.TopLeft != " " {
+		t.Fatalf("expected blanked frame after toggle, top-left = %q", frame.TopLeft)
+	}
+	if got := ToggleMinimalFrame(); got != "rounded" {
+		t.Fatalf("second toggle → %q, want rounded (restore)", got)
+	}
+	if frame.TopLeft != "╭" {
+		t.Fatalf("expected rounded restored, top-left = %q", frame.TopLeft)
+	}
+}
+
+func TestToggleMinimalFrameRemembersNonMinimalStyle(t *testing.T) {
+	t.Cleanup(func() { SetFrameStyle("rounded") })
+
+	SetFrameStyle("thick")
+	ToggleMinimalFrame() // thick → minimal
+	if frame.TopLeft != " " {
+		t.Fatalf("expected minimal, top-left = %q", frame.TopLeft)
+	}
+	ToggleMinimalFrame() // minimal → thick (not rounded)
+	if frame.TopLeft != "┏" {
+		t.Fatalf("expected thick restored, top-left = %q", frame.TopLeft)
+	}
+}
+
+func TestToggleMinimalFrameStartingFromMinimalFallsBackToRounded(t *testing.T) {
+	t.Cleanup(func() { SetFrameStyle("rounded") })
+
+	// Simulate a user whose settings.yaml has `frame: minimal` — first
+	// press of ^B m should still produce visible chrome.
+	SetFrameStyle("minimal")
+	if got := ToggleMinimalFrame(); got != "rounded" {
+		t.Fatalf("from minimal-as-default → %q, want rounded fallback", got)
+	}
+}
+
+func TestCurrentFrameNameTracksSetFrameStyle(t *testing.T) {
+	t.Cleanup(func() { SetFrameStyle("rounded") })
+
+	SetFrameStyle("double")
+	if got := CurrentFrameName(); got != "double" {
+		t.Fatalf("CurrentFrameName = %q, want double", got)
+	}
+	SetFrameStyle("ASCII")
+	if got := CurrentFrameName(); got != "ascii" {
+		t.Fatalf("CurrentFrameName after ASCII = %q, want ascii (lowercased)", got)
+	}
+}
