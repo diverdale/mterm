@@ -139,6 +139,68 @@ func TestAppPrefixMTogglesMinimalFrame(t *testing.T) {
 	}
 }
 
+func TestAppPrefixLeftBracketOpensCopyMode(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	app.mode = modeSession
+
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+
+	if app.mode != modeCopyMode {
+		t.Fatalf("after ^B [, mode = %v, want modeCopyMode", app.mode)
+	}
+	if app.copyMode == nil {
+		t.Fatal("after ^B [, copyMode model must be non-nil")
+	}
+}
+
+func TestAppPrefixLeftBracketWithNoTabsSurfacesHint(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+
+	if app.mode == modeCopyMode {
+		t.Fatal("^B [ with no tabs should not enter copy mode")
+	}
+	if app.statusMsg != "open a session first" {
+		t.Fatalf("status = %q, want \"open a session first\"", app.statusMsg)
+	}
+}
+
+func TestAppCopyModeClosedReturnsToPrevMode(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	app.mode = modeSession
+
+	app.update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("[")})
+	if app.mode != modeCopyMode {
+		t.Fatalf("setup: mode = %v, want modeCopyMode", app.mode)
+	}
+
+	// q emits a copyModeClosedMsg via tea.Cmd. Run the cmd, feed the
+	// resulting msg back into the app — that's when the mode flips.
+	cmd := app.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if cmd == nil {
+		t.Fatal("q in copy mode should return a tea.Cmd")
+	}
+	app.update(cmd())
+	if app.mode != modeSession {
+		t.Fatalf("after copyModeClosedMsg, mode = %v, want modeSession", app.mode)
+	}
+	if app.copyMode != nil {
+		t.Fatal("copyMode model should be cleared on close")
+	}
+}
+
 func TestAppPlainKeyInSessionModeIsNotACommand(t *testing.T) {
 	app := newTestApp()
 	app.width, app.height = 80, 24

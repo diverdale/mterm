@@ -183,6 +183,35 @@ func (t *Terminal) RenderAt(offset int) string {
 	return strings.Join(rows, "\n")
 }
 
+// Snapshot returns every line currently available — all of scrollback
+// (oldest first) followed by every row of the live screen (top-to-bottom).
+// Each entry is one logical line with ANSI SGR escape sequences preserved
+// so callers can render in color; callers wanting plain text should
+// pass each through ansi.Strip.
+//
+// Snapshots are point-in-time: subsequent terminal writes do not affect
+// the returned slice. Cheap relative to a render (single grid walk per
+// row); fine to call on demand when entering copy mode.
+func (t *Terminal) Snapshot() []string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	sb := t.vt.Scrollback()
+	sbLen := sb.Len()
+
+	rows := make([]string, 0, sbLen+t.h)
+	for i := 0; i < sbLen; i++ {
+		ln := sb.Line(i)
+		if ln == nil {
+			rows = append(rows, "")
+			continue
+		}
+		rows = append(rows, ln.Render())
+	}
+	rows = append(rows, strings.Split(t.vt.Render(), "\n")...)
+	return rows
+}
+
 // CursorPosition returns the 0-indexed cursor column and row.
 func (t *Terminal) CursorPosition() (x, y int) {
 	t.mu.Lock()

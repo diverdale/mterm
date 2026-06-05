@@ -34,30 +34,26 @@ XL ≈ structural change to the app, multiple branches.
 - Per-tab session timer, animated status spinner
 - `^B m` minimal-frame toggle — flips chrome to spaces for clipboard-friendly
   mouse-drag grabs; second press restores the prior style
+- `^B [` keyboard copy mode — vim-style scrollback navigation, line-range
+  selection with `v` mark + Enter, OSC 52 + native (pbcopy/wl-copy/xclip)
+  fallback delivery; frame chars never enter the payload
 
 ---
 
 ## Tier 1 — table stakes for SecureCRT defectors
 
-### Clipboard copy mode (tmux-style) — DEFERRED pending `^B m` evaluation
-**Status:** The lightweight alternative (`^B m` minimal-frame toggle) shipped
-in v0.1.1. Reassess whether the full keyboard copy mode is still needed
-after a few days of live use; many flows are covered by "flip to minimal,
-drag-select, flip back."
-**What:** `^B [` enters a keyboard-driven scrollback navigation mode; mark
-selection with `space` / `v` + cursor movement; `Enter` pushes the bytes
-straight to the system clipboard via OSC 52 (with `pbcopy` / `xclip` /
-`wl-copy` fallback when the host terminal has OSC 52 disabled). `^B ]` or
-`q` exits without copying.
-**Why:** Mouse-drag selection grabs whatever's visually on screen — including
-mterm's frame chars (`│`, `╭`, etc.). A keyboard copy mode bypasses the
-terminal's selection layer entirely and yields exactly the session bytes,
-no chrome. `^B m` solves ~70%; this is the clean fix if 70% isn't enough.
-**Size:** M
-**Open:** Could share machinery with "Scrollback search" (regex jump inside
-the same mode). Multi-line preservation vs flatten on copy. Whether to
-remember the last selection across re-entries.
-**Depends on:** nothing.
+### Clipboard copy mode (tmux-style) ✓ shipped
+Both copy paths now exist: `^B m` for the lightweight "flip frame and
+drag-select" workflow, and `^B [` for fully-keyboard line-range selection
+that pushes through OSC 52 + native helpers (pbcopy / wl-copy / xclip /
+xsel). Selection model is line-range only in v1 — character-precise
+selection is a small follow-on if/when someone hits the limit.
+
+Follow-ons left on the table:
+- Character-precise selection (cells within a line)
+- Scrollback regex search (`/` inside copy mode) — overlaps with the
+  Scrollback search Tier 1 item below
+- Remember last selection across re-entries
 
 ### Broadcast input (sync mode)
 **What:** Type once, keystrokes go to every tab in the sync set. Toggle membership per tab.
@@ -226,7 +222,6 @@ Ship B first as `auto_multiplex: tmux` (per host) for cheap wins; revisit A late
 
 Roughly ordered by dependency + effort + bang-for-buck. Each is its own branch.
 
-0. **Clipboard copy mode (tmux-style)** (M) — deferred; `^B m` toggle covers most cases
 1. **Per-host visual identity** (S) — tiny diff, big safety, no deps
 2. **Connection groups in picker** (S) — finishes earlier deferred work
 3. **Per-session logging** (S–M) — unblocks trigger "log to file"

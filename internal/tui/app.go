@@ -2,12 +2,14 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"mterm/internal/appmeta"
+	"mterm/internal/clipboard"
 	"mterm/internal/config"
 	"mterm/internal/diag"
 	"mterm/internal/history"
@@ -27,6 +29,7 @@ const (
 	modeHelp
 	modeWorkspaceSave
 	modeFileBrowser
+	modeCopyMode
 )
 
 // renderInterval is the coalesced redraw cadence (~30 fps).
@@ -59,6 +62,7 @@ type App struct {
 	help          *helpModel
 	workspaceSave *workspaceSaveModel
 	fileBrowser   *fileBrowserModel
+	copyMode      *copyModeModel
 	prevMode      viewMode
 	tabs          []*sessionTab
 	active        int
@@ -222,6 +226,27 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 		a.mode = a.prevMode
 		return nil
 
+	case copyModeClosedMsg:
+		a.copyMode = nil
+		a.mode = a.prevMode
+		return nil
+
+	case copyModeCopyMsg:
+		// Push the selection to the system clipboard, then drop back to
+		// the session. Surface success / failure in the status line so a
+		// terminal that silently rejected OSC 52 still gives the user
+		// feedback that something was attempted.
+		if m.Text == "" {
+			a.statusMsg = "copy: nothing selected"
+		} else if err := clipboard.Copy(os.Stdout, m.Text); err != nil {
+			a.statusMsg = fmt.Sprintf("copy: %v", err)
+		} else {
+			a.statusMsg = fmt.Sprintf("copied %d line(s) to clipboard", m.Lines)
+		}
+		a.copyMode = nil
+		a.mode = a.prevMode
+		return nil
+
 	case fileBrowserRefreshMsg:
 		if a.fileBrowser == nil {
 			return nil
@@ -277,6 +302,8 @@ func (a *App) handleKey(k tea.KeyMsg) tea.Cmd {
 		return a.workspaceSave.Update(k)
 	case modeFileBrowser:
 		return a.fileBrowser.Update(k)
+	case modeCopyMode:
+		return a.copyMode.Update(k)
 	}
 
 	// Direct tab-switch shortcuts. Active only in session mode with >1
@@ -372,6 +399,14 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 			return a.fileBrowser.Init()
 		}
 		a.statusMsg = "open a session first"
+	case "[":
+		if t := a.activeTab(); t != nil {
+			a.prevMode = a.mode
+			a.copyMode = newCopyModeModel(t.term)
+			a.mode = modeCopyMode
+		} else {
+			a.statusMsg = "open a session first"
+		}
 	case "s":
 		a.toggleActiveTabSync()
 	case "m":
@@ -594,6 +629,8 @@ func (a *App) View() string {
 			a.workspaceSave.View())
 	case modeFileBrowser:
 		return a.fileBrowserView()
+	case modeCopyMode:
+		return a.copyModeView()
 	default:
 		return a.pickerView()
 	}
@@ -645,6 +682,42 @@ func (a *App) fileBrowserView() string {
 		title:    title,
 		tabStrip: tabs,
 		body:     a.fileBrowser.View(),
+		footer:   footer,
+		width:    a.width,
+		height:   a.height,
+	}, s)
+}
+
+// copyModeView frames the copy overlay inside the standard window chrome
+// so the active tab's borders, tab strip, and footer hints stay visible
+// while the body shows the scrollback snapshot + selection cursor.
+func (a *App) copyModeView() string {
+	t := a.activeTab()
+	if t == nil || a.copyMode == nil {
+		a.mode = a.prevMode
+		return a.View()
+	}
+	bodyW := a.width - chromeCols
+	bodyH := a.height - chromeRows
+	if bodyW < 10 {
+		bodyW = 10
+	}
+	if bodyH < 5 {
+		bodyH = 5
+	}
+	a.copyMode.setSize(bodyW, bodyH)
+	s := chromeStylesFor(t.host.BorderColor)
+	title := s.title.Render(appmeta.Name) + statusCount(len(a.tabs)) + statusMsgBadge(a.statusMsg)
+	tabs := renderTabStrip(a.tabs, a.active, a.tickCount, a.width-2, s, a.syncTabs)
+	footer := renderFooter(footerOpts{
+		hints: []keyHint{{"↑↓/jk", "move"}, {"v", "mark"}, {"Enter", "copy"}, {"q", "quit"}},
+		info:  sessionInfo(t.host),
+		width: a.width - 2,
+	}, s)
+	return renderWindow(windowOpts{
+		title:    title,
+		tabStrip: tabs,
+		body:     a.copyMode.View(),
 		footer:   footer,
 		width:    a.width,
 		height:   a.height,

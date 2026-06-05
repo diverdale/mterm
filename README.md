@@ -56,6 +56,11 @@ The `~/.config/mterm/` directory is created automatically on first run.
 - Six chrome frame styles (rounded / square / thick / double / ascii /
   minimal) selectable at runtime or pinned via `settings.yaml`; `^B m`
   toggles to/from minimal for clipboard-friendly grabs
+- Keyboard copy mode (`^B [`) — navigate scrollback with vim-style keys,
+  mark a range with `v`, hit Enter to push to the system clipboard via
+  OSC 52 (with `pbcopy` / `wl-copy` / `xclip` native fallback). Frame
+  chars never enter the selection — fixes the "chrome bled into clipboard"
+  papercut for keyboard users
 - Per-host visual identity — `bordercolor:` tints the frame, active tab chip, and footer key hints so prod ≠ staging at a glance
 - Per-session output logging to `~/.config/mterm/logs/<host>/<timestamp>.log` (default on; per-host opt-out)
 - Broadcast input — `^B s` toggles a tab into a sync set; type once, fan to every member
@@ -81,6 +86,7 @@ The prefix is **`^B`** (Ctrl-B), tmux-style. Press it, then the command key.
 | `^B f`    | open the port-forwards panel                        |
 | `^B s`    | toggle the current tab in the broadcast sync set    |
 | `^B m`    | toggle minimal frame ↔ previous style (clipboard-friendly chrome) |
+| `^B [`    | enter keyboard copy mode (select scrollback → system clipboard) |
 | `^B u`    | open the two-pane SFTP file browser for the active tab |
 | `^B :`    | open the command palette                            |
 | `^B ?`    | open the keybinding help overlay                    |
@@ -176,6 +182,46 @@ with `Insert`/`Space`, view-file (pipe through `less`), edit-file,
 sort/filter modes, drag-and-drop from the host terminal. None are
 hard to add — each is a small standalone branch when the demand
 shows up.
+
+## Copy mode (`^B [`)
+
+Keyboard-driven selection out of the active session's scrollback. Skips
+the terminal's mouse-selection layer entirely, so the window border and
+tab/footer chrome never enter the clipboard.
+
+Press `^B [` to enter. The body swaps to a frozen snapshot of all
+available scrollback plus the live screen at the moment you opened the
+mode — new output keeps streaming to the underlying session but doesn't
+shift the view under you.
+
+| Key                | Action |
+|--------------------|--------|
+| `↑` / `k`          | cursor up one line |
+| `↓` / `j`          | cursor down one line |
+| `PgUp` / `^B`      | page up |
+| `PgDn` / `^F`      | page down |
+| `g`                | jump to oldest line |
+| `G`                | jump to bottom (most recent line) |
+| `v` or `Space`     | toggle the selection anchor at the cursor |
+| `Enter` or `y`     | copy the selection to the clipboard and exit |
+| `q` or `Esc`       | exit without copying |
+
+Selection is **line-range only** in v1: marking with `v` and moving the
+cursor selects every line between (and including) the anchor and the
+cursor; pressing `v` again drops the anchor. Without an anchor, Enter
+copies just the cursor line. The bottom status bar reports state:
+
+```
+COPY · 12 lines · v unmark · Enter copy · q quit
+```
+
+The clipboard payload is **ANSI-stripped plain text**, lines joined
+with `\n`, trailing whitespace trimmed from each line. mterm tries
+two delivery paths in parallel — OSC 52 (works in iTerm2, kitty,
+alacritty, wezterm, foot, recent gnome-terminal, recent Terminal.app,
+recent xterm) and a native shell-out (`pbcopy` on macOS, `wl-copy` on
+Wayland, `xclip` or `xsel` on X11). Either path succeeding counts; the
+footer reports `copied N line(s) to clipboard` on success.
 
 ## hosts.yaml reference
 

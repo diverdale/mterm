@@ -39,6 +39,7 @@ var helpSections = []struct {
 		{"^B f", "open forwards panel"},
 		{"^B s", "toggle tab in broadcast sync set"},
 		{"^B m", "toggle minimal frame (clipboard-friendly chrome)"},
+		{"^B [", "enter copy mode (keyboard select scrollback → clipboard)"},
 		{"^B u", "open file browser (sftp upload/download)"},
 		{"^B :", "open command palette"},
 		{"^B ?", "this help"},
