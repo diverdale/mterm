@@ -1,6 +1,23 @@
 # mterm
 
-A Go-powered multi-connection SSH TUI. Tabbed sessions, fuzzy host picker, full-fidelity VT terminal, tmux-style prefix navigation. Aiming to be the no-bullshit alternative to SecureCRT for engineers who live in the terminal.
+A Go-powered multi-connection SSH TUI. Tabbed sessions, fuzzy host picker,
+full-fidelity VT terminal, tmux-style prefix navigation. Aiming to be the
+no-bullshit alternative to SecureCRT for engineers who live in the terminal.
+
+## Contents
+
+- [Quick start](#quick-start)
+- [Features](#features)
+- [File browser](#file-browser-b-u)
+- [Copy mode](#copy-mode-b-)
+- [hosts.yaml reference](#hostsyaml-reference)
+- [ssh_config interaction](#ssh_config-interaction)
+- [Customization](#customization)
+- [Configuration directory](#configuration-directory)
+- [Common keys](#common-keys) — full reference: [docs/keybindings.md](docs/keybindings.md)
+- [Building & distribution](docs/building.md)
+- [Roadmap](docs/superpowers/roadmap.md)
+- [License](#license)
 
 ## Quick start
 
@@ -9,7 +26,10 @@ go build -o mterm .
 ./mterm
 ```
 
-On first launch mterm reads `~/.ssh/config` for your existing host aliases and lists them in the picker. To add hosts that aren't in ssh_config — or to overlay extra metadata (groups, color tags, port forwards, logging opt-out, etc.) on existing ones — create `~/.config/mterm/hosts.yaml`:
+On first launch mterm reads `~/.ssh/config` for your existing host aliases
+and lists them in the picker. To add hosts that aren't in ssh_config — or
+to overlay extra metadata (groups, color tags, port forwards, logging
+opt-out, etc.) on existing ones — create `~/.config/mterm/hosts.yaml`:
 
 ```yaml
 hosts:
@@ -24,94 +44,38 @@ The `~/.config/mterm/` directory is created automatically on first run.
 
 ## Features
 
-- Tabbed SSH sessions with `^B` prefix navigation (tmux-style)
-- Native Go SSH client — agent auth + per-host `identityfile:` fallback
-  (so a reboot-cleared agent doesn't break connections when the key is
-  on disk), lenient `known_hosts`
-- Full-fidelity VT terminal: cursor, 24-bit color
-- Mouse-wheel scrollback on the active session — scroll up to browse
-  history, type any key to snap back to live. Viewport stays anchored to
-  the same content as new output streams in
-- Activity / silence indicators in the tab strip — background tabs that
-  receive new output get a warning-color glyph; tabs that go quiet after
-  activity transition to an accent-color "done" glyph. Focusing a tab
-  clears its badge.
-- Per-host startup commands — `on_connect: [...]` in hosts.yaml runs
-  shell commands right after handshake (auto-attach to tmux/screen,
-  jump into a working dir, etc.)
-- Two-pane SFTP file browser (`^B u`) for upload/download against the
-  active session, with live progress + cancel
-- Workspaces — save+restore named tab sets via the command palette.
-  "Save current tabs as workspace…" pops a name prompt; "Restore
-  workspace: …" reopens every host in one keystroke; missing hosts
-  surface in the status line. Persisted at `~/.config/mterm/workspaces.json`.
-- Auto-reconnect on transport failure
-- Fuzzy host picker reading `~/.ssh/config` + `~/.config/mterm/hosts.yaml`
-  with per-host connection state — `◉` currently in a tab, `●` previously
-  connected (with "5m ago" / "2h ago" / "3d ago" relative time), `○` never
-  connected; group headers show counts (`▸ HOME (3)`)
-- Themable UI — built-in themes (Midnight / Matrix / Synthwave) plus
-  user-defined themes via `~/.config/mterm/themes.yaml`. Switch from the
-  command palette
-- Six chrome frame styles (rounded / square / thick / double / ascii /
-  minimal) selectable at runtime or pinned via `settings.yaml`; `^B m`
-  toggles to/from minimal for clipboard-friendly grabs
-- Keyboard copy mode (`^B [`) — navigate scrollback with vim-style keys,
-  mark a range with `v`, hit Enter to push to the system clipboard via
-  OSC 52 (with `pbcopy` / `wl-copy` / `xclip` native fallback). Frame
-  chars never enter the selection — fixes the "chrome bled into clipboard"
-  papercut for keyboard users
-- Per-host visual identity — `bordercolor:` tints the frame, active tab chip, and footer key hints so prod ≠ staging at a glance
-- Per-session output logging to `~/.config/mterm/logs/<host>/<timestamp>.log` (default on; per-host opt-out)
-- Broadcast input — `^B s` toggles a tab into a sync set; type once, fan to every member
-- Command palette (`^B :`) with fuzzy command search
-- Help overlay (`^B ?`)
-- Port-forwarding panel (`^B f`)
-
-Roadmap and pending items: `docs/superpowers/roadmap.md`.
-
-## Keybindings
-
-The prefix is **`^B`** (Ctrl-B), tmux-style. Press it, then the command key.
-
-| Key       | Action                                              |
-|-----------|-----------------------------------------------------|
-| `^B c`    | open the picker (new connection)                    |
-| `^B n`    | next tab                                            |
-| `^B p`    | previous tab                                        |
-| `^B 1..9` | jump to tab N                                       |
-| `^←` / `^→`     | previous / next tab in session mode (no prefix needed). Note: shadows shell word-jump on the remote — use Option-Left/Right on macOS for word-jump |
-| `^PgUp` / `^PgDn` | previous / next tab in session mode (no prefix needed; no shell conflict) |
-| `^B x`    | close the current tab                               |
-| `^B f`    | open the port-forwards panel                        |
-| `^B s`    | toggle the current tab in the broadcast sync set    |
-| `^B m`    | toggle minimal frame ↔ previous style (clipboard-friendly chrome) |
-| `^B [`    | enter keyboard copy mode (select scrollback → system clipboard) |
-| `^B u`    | open the two-pane SFTP file browser for the active tab |
-| `^B :`    | open the command palette                            |
-| `^B ?`    | open the keybinding help overlay                    |
-| `^B D`    | dump every goroutine's stack to `/tmp/mterm-stacks-…` for diagnosis (status line shows the file path) |
-| `^B q`    | quit mterm                                          |
-| `^C`      | passes through to the remote session (SIGINT)       |
-| wheel ↑/↓ | scroll the active tab's scrollback; any key snaps back to live |
-
-In the picker:
-
-| Key      | Action                |
-|----------|-----------------------|
-| (type)   | fuzzy-filter hosts    |
-| ↑ / ↓    | move cursor           |
-| Enter    | connect               |
-| Esc      | back to active session|
-
-In the command palette:
-
-| Key      | Action                |
-|----------|-----------------------|
-| (type)   | filter commands       |
-| ↑ / ↓    | move cursor           |
-| Enter    | run                   |
-| Esc      | cancel                |
+- **Tabbed SSH sessions** with `^B` prefix navigation (tmux-style); native
+  Go SSH client, agent auth + per-host `identityfile:` fallback, lenient
+  `known_hosts`
+- **Full-fidelity VT terminal** — cursor, 24-bit color, mouse-wheel
+  scrollback that snaps back to live on any keystroke
+- **Activity / silence indicators** in the tab strip — output on background
+  tabs lights a warning glyph; tabs going quiet after activity transition
+  to a "done" glyph
+- **Fuzzy host picker** with per-host connection state (`◉` in tab, `●`
+  previously connected with relative time, `○` never connected); group
+  headers show counts
+- **Two-pane SFTP file browser** (`^B u`) — upload/download against the
+  active session with live progress + cancel ([details](#file-browser-b-u))
+- **Keyboard copy mode** (`^B [`) — vim-style scrollback selection that
+  pushes to the system clipboard via OSC 52 + native fallbacks; frame
+  chars never leak into the payload ([details](#copy-mode-b-))
+- **Workspaces** — save+restore named tab sets from the command palette;
+  reopens every host in one keystroke
+- **Per-host startup commands** — `on_connect:` runs shell commands right
+  after handshake (auto-attach tmux, jump into a dir, etc.)
+- **Broadcast input** — `^B s` toggles a tab into a sync set; type once,
+  fan to every member
+- **Themable UI** — built-in themes (Midnight / Matrix / Synthwave), plus
+  user-defined themes via `themes.yaml`; six frame styles (`^B m` quick
+  toggles to minimal for clipboard grabs) ([details](#customization))
+- **Per-host visual identity** — `bordercolor:` tints frame, active tab
+  chip, footer hints so prod ≠ staging at a glance
+- **Per-session output logging** to `~/.config/mterm/logs/<host>/<timestamp>.log`
+  (default on; per-host opt-out)
+- **Command palette** (`^B :`) with fuzzy command search;
+  **help overlay** (`^B ?`); **port-forwarding panel** (`^B f`);
+  **auto-reconnect** on transport failure
 
 ## File browser (`^B u`)
 
@@ -119,8 +83,6 @@ A two-pane SFTP browser for the active session — left pane is your local
 filesystem, right pane is the remote. Copies are direction-implicit: the
 **active pane is the source**, the other pane is the destination. So
 local-active → `F5` uploads; remote-active → `F5` downloads.
-
-Layout:
 
 ```
 ╭─ mterm  [1 tabs] ──────────────────────────────────────────────────────╮
@@ -142,18 +104,7 @@ Layout:
 ╰────────────────────────────────────────────────────────────────────────╯
 ```
 
-### Controls
-
-| Key            | Action |
-|----------------|--------|
-| `Tab`          | switch active pane (left ↔ right) |
-| `↑` / `↓` or `j` / `k` | move cursor in the active pane |
-| `Enter` / `→` / `l`    | descend into the highlighted directory; `..` goes up |
-| `Backspace` / `←` / `h` | go up to the parent directory |
-| `F5` or `c`    | copy highlighted file from active pane → other pane (with live progress) |
-| `Esc`          | cancel an in-flight transfer; otherwise close the browser |
-| `r`            | refresh both panes |
-| `.`            | toggle hidden files (filenames starting with `.`) |
+Full key list: [docs/keybindings.md → File browser](docs/keybindings.md#file-browser-b-u).
 
 ### Behavior
 
@@ -175,13 +126,12 @@ Layout:
 - **Concurrency.** A single transfer at a time per browser. While one
   is running, `F5` is ignored until it completes or you cancel.
 
-### Not yet shipped (deferred to follow-on iterations)
+### Not yet shipped
 
 `F6` rename, `F7` mkdir, `F8` delete (with confirmation), multi-select
 with `Insert`/`Space`, view-file (pipe through `less`), edit-file,
-sort/filter modes, drag-and-drop from the host terminal. None are
-hard to add — each is a small standalone branch when the demand
-shows up.
+sort/filter modes, drag-and-drop from the host terminal. None are hard
+to add — each is a small standalone branch when the demand shows up.
 
 ## Copy mode (`^B [`)
 
@@ -194,17 +144,7 @@ available scrollback plus the live screen at the moment you opened the
 mode — new output keeps streaming to the underlying session but doesn't
 shift the view under you.
 
-| Key                | Action |
-|--------------------|--------|
-| `↑` / `k`          | cursor up one line |
-| `↓` / `j`          | cursor down one line |
-| `PgUp` / `^B`      | page up |
-| `PgDn` / `^F`      | page down |
-| `g`                | jump to oldest line |
-| `G`                | jump to bottom (most recent line) |
-| `v` or `Space`     | toggle the selection anchor at the cursor |
-| `Enter` or `y`     | copy the selection to the clipboard and exit |
-| `q` or `Esc`       | exit without copying |
+Full key list: [docs/keybindings.md → Copy mode](docs/keybindings.md#copy-mode-b-).
 
 Selection is **line-range only** in v1: marking with `v` and moving the
 cursor selects every line between (and including) the anchor and the
@@ -215,17 +155,26 @@ copies just the cursor line. The bottom status bar reports state:
 COPY · 12 lines · v unmark · Enter copy · q quit
 ```
 
-The clipboard payload is **ANSI-stripped plain text**, lines joined
-with `\n`, trailing whitespace trimmed from each line. mterm tries
-two delivery paths in parallel — OSC 52 (works in iTerm2, kitty,
-alacritty, wezterm, foot, recent gnome-terminal, recent Terminal.app,
-recent xterm) and a native shell-out (`pbcopy` on macOS, `wl-copy` on
-Wayland, `xclip` or `xsel` on X11). Either path succeeding counts; the
-footer reports `copied N line(s) to clipboard` on success.
+The clipboard payload is **ANSI-stripped plain text**, lines joined with
+`\n`, trailing whitespace trimmed from each line. mterm tries two delivery
+paths in parallel — OSC 52 (works in iTerm2, kitty, alacritty, wezterm,
+foot, recent gnome-terminal, recent Terminal.app, recent xterm) and a
+native shell-out (`pbcopy` on macOS, `wl-copy` on Wayland, `xclip` or
+`xsel` on X11). Either path succeeding counts; the footer reports
+`copied N line(s) to clipboard` on success.
+
+### Quick alternative — `^B m`
+
+If you want to mouse-drag-select instead, `^B m` swaps the frame chars
+for spaces so a drag doesn't pick them up. Second press restores. The
+footer briefly reports `frame: minimal` / `frame: <prior>` so you know
+which state you're in.
 
 ## hosts.yaml reference
 
-All fields are optional unless noted. Field names are **lowercase** by convention; unknown or wrong-cased keys surface as startup warnings rather than being silently dropped.
+All fields are optional unless noted. Field names are **lowercase** by
+convention; unknown or wrong-cased keys surface as startup warnings
+rather than being silently dropped.
 
 ### Host fields
 
@@ -238,7 +187,7 @@ All fields are optional unless noted. Field names are **lowercase** by conventio
 | `group`       | string    | (none)        | Picker group label. Slash-delimited paths nest sub-groups (`Home/Media`, `Work/Project1`). For multi-host hierarchies prefer the structured `groups:` form (see below). |
 | `tags`        | []string  | (none)        | Tag list shown in `[…]` brackets next to the host in the picker. |
 | `forwards`    | []Forward | (none)        | Port-forwarding rules. See below. |
-| `bordercolor` | string    | (theme accent)| Hex `#RRGGBB`/`#RGB` OR a named color (see ["Built-in color names"](#built-in-color-names) below). When this host's tab is active, the window frame, active tab chip, footer key hints, and `user@host:port` segment all use this color. Invalid values warn and are ignored. |
+| `bordercolor` | string    | (theme accent)| Hex `#RRGGBB`/`#RGB` OR a named color (see [Color names](#color-names)). When this host's tab is active, the window frame, active tab chip, footer key hints, and `user@host:port` segment all use this color. Invalid values warn and are ignored. |
 | `identityfile`| string    | (none)        | Path to an SSH private key file. Tried *before* the agent, mimicking `ssh`'s fallback. `~/` and `$HOME` are expanded. Encrypted keys are not supported — load those via `ssh-add --apple-use-keychain` instead. |
 | `on_connect`  | []string  | (none)        | Shell commands to send to the remote after handshake. Each gets a trailing CR. Common uses: auto-attach to tmux/screen (`tmux new -A -s mterm-$USER`), `cd` into a working dir. |
 | `log`         | bool      | `true`        | Set `false` to opt out of per-session output logging for this host. |
@@ -255,132 +204,10 @@ Each entry inside `forwards:`:
 | `dialaddr` | string | **required** | Destination address. |
 | `dialport` | int    | **required** | Destination port. |
 
-### Built-in color names
-
-Names that `bordercolor:` accepts out of the box (case-insensitive). Add or
-override any of them in `~/.config/mterm/colors.yaml`.
-
-| Family    | Names                                                          |
-|-----------|----------------------------------------------------------------|
-| Reds / pinks   | `red` `#FF3344` · `darkred` `#8B0000` · `crimson` `#DC143C` · `hotpink` `#FF69B4` · `pink` `#FFB6C1` |
-| Oranges / yellows | `orange` `#FF8C00` · `gold` `#FFD700` · `yellow` `#FFD93D` · `amber` `#FFB347` |
-| Greens         | `green` `#33CC66` · `limegreen` `#32CD32` · `darkgreen` `#006400` · `olive` `#808000` · `teal` `#008080` |
-| Blues / cyans  | `blue` `#3344FF` · `navy` `#000080` · `sky` `#87CEEB` · `cyan` `#00CCDD` |
-| Purples        | `purple` `#8A2BE2` · `magenta` `#F92AAD` · `violet` `#8B5CF6` |
-| Neutrals       | `white` `#FFFFFF` · `gray` / `grey` `#808080` · `black` `#000000` · `silver` `#C0C0C0` |
-| Environment flags | `prodred` `#CC0000` · `stageyellow` `#E5C07B` · `devgreen` `#33CC66` |
-
-Custom palette example (`~/.config/mterm/colors.yaml`):
-
-```yaml
-# User entries override built-ins of the same name.
-myprodred: "#CC0000"
-slackpurple: "#4A154B"
-corpblue: "#3344FF"
-vendorblue: "#1BA0D7"
-```
-
-Then in `hosts.yaml`:
-
-```yaml
-hosts:
-  - name: prod-db
-    address: 10.0.0.5
-    bordercolor: corpblue        # resolves through colors.yaml
-  - name: lab-box
-    address: 10.0.0.6
-    bordercolor: limegreen       # built-in
-  - name: stage-db
-    address: 10.0.0.7
-    bordercolor: "#E5C07B"       # hex still works
-```
-
-`^B :` → `Reload config` re-reads both files so edits take effect without
-restarting mterm.
-
-### Custom themes (themes.yaml)
-
-mterm ships three built-in themes — `midnight` (default), `matrix`,
-`synthwave` — switchable from `^B :` → `Theme: <name>`. Add your own in
-`~/.config/mterm/themes.yaml`; they appear in the palette alongside the
-built-ins and survive across runs.
-
-A theme is a flat map of seven color slots. Each is a hex string (`#RRGGBB`
-or `#RGB`). **All slots are optional** — unset fields inherit the value
-from `midnight`, so partial themes like "just darken the frame" work
-cleanly without copying the whole palette.
-
-| Slot        | What it tints |
-|-------------|----------------|
-| `accent`    | Active tab text, host name in title, focus highlights, palette selection bar background, PREFIX badge background, `^B` keys in the footer |
-| `frame`     | Window borders and dividers |
-| `dim`       | Inactive tab text, secondary text, group headers in the picker, palette command labels |
-| `text`      | Primary foreground (where it's distinct from terminal output) |
-| `warning`   | `[sync N]` / `[scroll N]` / `[restored]` status badges, broadcast sync `*` glyph, tab activity indicator |
-| `error`     | Connection errors, palette validation errors |
-| `connected` | Tab status dot for a connected session, silence indicator on idle background tabs |
-
-Example — a Nord-inspired theme plus a quick partial override:
-
-```yaml
-# ~/.config/mterm/themes.yaml
-nordlike:
-  accent:    "#88C0D0"
-  frame:     "#3B4252"
-  dim:       "#4C566A"
-  text:      "#ECEFF4"
-  warning:   "#EBCB8B"
-  error:     "#BF616A"
-  connected: "#A3BE8C"
-
-just-the-accent:
-  accent: "#FF00FF"
-  # frame/dim/text/warning/error/connected → inherit midnight
-```
-
-Theme names are case-insensitive and trimmed; the palette lists user
-themes alphabetically after the built-ins. Switch at runtime via the
-palette; `^B :` → `Reload config` picks up edits.
-
-### Frame style (settings.yaml)
-
-The chrome borders (window frame, dividers between tab strip / body /
-footer) can be drawn in six different glyph sets. Set the default in
-`~/.config/mterm/settings.yaml`:
-
-```yaml
-frame: rounded   # default — matches the pre-customization look
-```
-
-Six options:
-
-| Name      | Corners + edge sample          | Notes |
-|-----------|--------------------------------|-------|
-| `rounded` | `╭─╮ ├ ┤ ╰─╯`                  | default; soft modern look |
-| `square`  | `┌─┐ ├ ┤ └─┘`                  | sharp corners |
-| `thick`   | `┏━┓ ┣ ┫ ┗━┛`                  | heavy lines — handy for "loud prod" feel |
-| `double`  | `╔═╗ ╠ ╣ ╚═╝`                  | classic two-line |
-| `ascii`   | `+-+ + + +-+`                  | for terminals without box-drawing support |
-| `minimal` | spaces                         | quiet chrome, no visible border |
-
-Switch at runtime from `^B :` → `Frame: <name>`. Unknown names fall back
-to the previous setting and surface as a warning. `^B :` →
-`Reload config` re-reads `settings.yaml`.
-
-**Quick toggle:** `^B m` flips between `minimal` and your previously
-active style. Handy when you want to grab a chunk of output with the
-mouse — the frame chars get out of the way, you drag-select, you flip
-back. The footer briefly reports `frame: minimal` / `frame: <prior>` so
-you know which state you're in.
-
-`settings.yaml` is also where future global toggles (a confirm-quit
-switch, a default theme name, etc.) will land — single file, room to
-grow.
-
 ### Two ways to define hosts
 
-There are two top-level keys: `hosts:` (a flat list) and `groups:` (a nested
-tree). They can coexist in the same file.
+There are two top-level keys: `hosts:` (a flat list) and `groups:` (a
+nested tree). They can coexist in the same file.
 
 | Form                  | Best for                                          |
 |-----------------------|---------------------------------------------------|
@@ -427,10 +254,10 @@ groups:
             user: alice
 ```
 
-Hosts inherit their slash-delimited group path from their position in the
-tree — no `group:` field needed under nested groups (any value would be
-overridden by the walk anyway). Sub-groups can nest arbitrarily deep; the
-picker indents two spaces per level.
+Hosts inherit their slash-delimited group path from their position in
+the tree — no `group:` field needed under nested groups (any value
+would be overridden by the walk anyway). Sub-groups can nest arbitrarily
+deep; the picker indents two spaces per level.
 
 ### Flat form (simple / ssh_config overlay)
 
@@ -537,12 +364,144 @@ hosts:
 
 ## ssh_config interaction
 
-mterm reads `~/.ssh/config` first; each non-wildcard `Host` block becomes a base host. Then `hosts.yaml` is layered on:
+mterm reads `~/.ssh/config` first; each non-wildcard `Host` block becomes
+a base host. Then `hosts.yaml` is layered on:
 
-- A `hosts.yaml` entry whose `name` matches an ssh_config alias **overlays** — non-empty mterm fields win; the ssh_config base fills in everything else (`HostName`, `User`, `IdentityFile`, etc.).
-- A `hosts.yaml` entry whose `name` does NOT match any ssh_config alias becomes a new mterm-source host.
+- A `hosts.yaml` entry whose `name` matches an ssh_config alias **overlays**
+  — non-empty mterm fields win; the ssh_config base fills in everything
+  else (`HostName`, `User`, `IdentityFile`, etc.).
+- A `hosts.yaml` entry whose `name` does NOT match any ssh_config alias
+  becomes a new mterm-source host.
 
-In other words: ssh_config carries connection essentials; hosts.yaml adds mterm-specific polish (groups, colors, logging, tags) and any hosts you don't want in your ssh_config.
+In other words: ssh_config carries connection essentials; hosts.yaml adds
+mterm-specific polish (groups, colors, logging, tags) and any hosts you
+don't want in your ssh_config.
+
+## Customization
+
+Three independent surfaces — pick none, one, or all:
+
+| Surface             | File                              | What it controls |
+|---------------------|-----------------------------------|------------------|
+| **Border colors**   | `~/.config/mterm/colors.yaml`     | Named color shortcuts usable from `bordercolor:` |
+| **Themes**          | `~/.config/mterm/themes.yaml`     | The seven-color palette mterm uses for chrome |
+| **Frame style**     | `~/.config/mterm/settings.yaml`   | Glyph set drawn for the window borders / dividers |
+
+All three are re-read by `^B :` → `Reload config` so edits take effect
+without restarting mterm.
+
+### Color names
+
+Names that `bordercolor:` accepts out of the box (case-insensitive). Add
+or override any of them in `~/.config/mterm/colors.yaml`.
+
+| Family            | Names |
+|-------------------|-------|
+| Reds / pinks      | `red` `#FF3344` · `darkred` `#8B0000` · `crimson` `#DC143C` · `hotpink` `#FF69B4` · `pink` `#FFB6C1` |
+| Oranges / yellows | `orange` `#FF8C00` · `gold` `#FFD700` · `yellow` `#FFD93D` · `amber` `#FFB347` |
+| Greens            | `green` `#33CC66` · `limegreen` `#32CD32` · `darkgreen` `#006400` · `olive` `#808000` · `teal` `#008080` |
+| Blues / cyans     | `blue` `#3344FF` · `navy` `#000080` · `sky` `#87CEEB` · `cyan` `#00CCDD` |
+| Purples           | `purple` `#8A2BE2` · `magenta` `#F92AAD` · `violet` `#8B5CF6` |
+| Neutrals          | `white` `#FFFFFF` · `gray` / `grey` `#808080` · `black` `#000000` · `silver` `#C0C0C0` |
+| Environment flags | `prodred` `#CC0000` · `stageyellow` `#E5C07B` · `devgreen` `#33CC66` |
+
+Custom palette example (`~/.config/mterm/colors.yaml`):
+
+```yaml
+# User entries override built-ins of the same name.
+myprodred: "#CC0000"
+slackpurple: "#4A154B"
+corpblue: "#3344FF"
+vendorblue: "#1BA0D7"
+```
+
+Then in `hosts.yaml`:
+
+```yaml
+hosts:
+  - name: prod-db
+    address: 10.0.0.5
+    bordercolor: corpblue        # resolves through colors.yaml
+  - name: lab-box
+    address: 10.0.0.6
+    bordercolor: limegreen       # built-in
+  - name: stage-db
+    address: 10.0.0.7
+    bordercolor: "#E5C07B"       # hex still works
+```
+
+### Themes (themes.yaml)
+
+mterm ships three built-in themes — `midnight` (default), `matrix`,
+`synthwave` — switchable from `^B :` → `Theme: <name>`. Add your own in
+`~/.config/mterm/themes.yaml`; they appear in the palette alongside the
+built-ins and survive across runs.
+
+A theme is a flat map of seven color slots. Each is a hex string
+(`#RRGGBB` or `#RGB`). **All slots are optional** — unset fields inherit
+the value from `midnight`, so partial themes like "just darken the frame"
+work cleanly without copying the whole palette.
+
+| Slot        | What it tints |
+|-------------|----------------|
+| `accent`    | Active tab text, host name in title, focus highlights, palette selection bar background, PREFIX badge background, `^B` keys in the footer |
+| `frame`     | Window borders and dividers |
+| `dim`       | Inactive tab text, secondary text, group headers in the picker, palette command labels |
+| `text`      | Primary foreground (where it's distinct from terminal output) |
+| `warning`   | `[sync N]` / `[scroll N]` / `[restored]` status badges, broadcast sync `*` glyph, tab activity indicator |
+| `error`     | Connection errors, palette validation errors |
+| `connected` | Tab status dot for a connected session, silence indicator on idle background tabs |
+
+Example — a Nord-inspired theme plus a quick partial override:
+
+```yaml
+# ~/.config/mterm/themes.yaml
+nordlike:
+  accent:    "#88C0D0"
+  frame:     "#3B4252"
+  dim:       "#4C566A"
+  text:      "#ECEFF4"
+  warning:   "#EBCB8B"
+  error:     "#BF616A"
+  connected: "#A3BE8C"
+
+just-the-accent:
+  accent: "#FF00FF"
+  # frame/dim/text/warning/error/connected → inherit midnight
+```
+
+Theme names are case-insensitive and trimmed; the palette lists user
+themes alphabetically after the built-ins.
+
+### Frame style (settings.yaml)
+
+The chrome borders (window frame, dividers between tab strip / body /
+footer) can be drawn in six different glyph sets. Set the default in
+`~/.config/mterm/settings.yaml`:
+
+```yaml
+frame: rounded   # default — matches the pre-customization look
+```
+
+Six options:
+
+| Name      | Corners + edge sample          | Notes |
+|-----------|--------------------------------|-------|
+| `rounded` | `╭─╮ ├ ┤ ╰─╯`                  | default; soft modern look |
+| `square`  | `┌─┐ ├ ┤ └─┘`                  | sharp corners |
+| `thick`   | `┏━┓ ┣ ┫ ┗━┛`                  | heavy lines — handy for "loud prod" feel |
+| `double`  | `╔═╗ ╠ ╣ ╚═╝`                  | classic two-line |
+| `ascii`   | `+-+ + + +-+`                  | for terminals without box-drawing support |
+| `minimal` | spaces                         | quiet chrome, no visible border |
+
+Switch at runtime from `^B :` → `Frame: <name>`. Unknown names fall back
+to the previous setting and surface as a warning.
+
+**Quick toggle:** `^B m` flips between `minimal` and your previously
+active style. Handy for clipboard grabs (see [Copy mode](#copy-mode-b-)).
+
+`settings.yaml` is also where future global toggles (a confirm-quit
+switch, a default theme name, etc.) will land — single file, room to grow.
 
 ## Configuration directory
 
@@ -550,145 +509,48 @@ mterm lives under `~/.config/mterm/`:
 
 | Path                                              | Purpose                          |
 |---------------------------------------------------|----------------------------------|
-| `~/.config/mterm/hosts.yaml`                      | Host overlay (this document)     |
+| `~/.config/mterm/hosts.yaml`                      | Host overlay (see [hosts.yaml reference](#hostsyaml-reference)) |
 | `~/.config/mterm/logs/<host>/<YYYYMMDD-HHMMSS>.log` | Per-session output logs        |
 | `~/.config/mterm/history.json`                    | Last-connected timestamps per host (powers the picker's "2h ago" decorations) |
 | `~/.config/mterm/workspaces.json`                 | Saved workspaces (named tab sets) |
-| `~/.config/mterm/colors.yaml`                     | User-defined `bordercolor` names (`yaml` map of name → hex, e.g. `myprodred: "#CC0000"`). Merged on top of mterm's built-in palette. |
-| `~/.config/mterm/themes.yaml`                     | User-defined themes (`yaml` map of theme-name → field map). Unset fields inherit Midnight. Appears in `^B :` → `Theme: <name>`. |
+| `~/.config/mterm/colors.yaml`                     | User-defined `bordercolor` names — yaml map of name → hex, e.g. `myprodred: "#CC0000"`. Merged on top of mterm's built-in palette. |
+| `~/.config/mterm/themes.yaml`                     | User-defined themes (yaml map of theme-name → field map). Unset fields inherit Midnight. Appears in `^B :` → `Theme: <name>`. |
 | `~/.config/mterm/settings.yaml`                   | Global toggles. Today: `frame: rounded\|square\|thick\|double\|ascii\|minimal`. |
 
-The directory is created automatically on first run. Logs are raw bytes including ANSI escapes — replay faithfully with `less -R <file>`, or strip ANSI for grep:
+The directory is created automatically on first run. Logs are raw bytes
+including ANSI escapes — replay faithfully with `less -R <file>`, or
+strip ANSI for grep:
 
 ```bash
 sed 's/\x1b\[[0-9;]*m//g' ~/.config/mterm/logs/prod-db-01/*.log | grep ERROR
 ```
 
-## Building for distribution
+## Common keys
 
-The repo ships a `build.sh` that cross-compiles stripped binaries to `dist/`
-for darwin/arm64, darwin/amd64, linux/amd64, linux/arm64 and emits a
-`SHA256SUMS` file. Windows is excluded because mterm uses `SIGUSR1` for the
-in-app goroutine dump.
+The prefix is **`^B`** (Ctrl-B). Twelve chords cover ~90% of the use:
 
-```bash
-./build.sh                 # all default platforms
-./build.sh darwin/arm64    # build just one
-```
+| Key       | Action |
+|-----------|--------|
+| `^B c`    | open the picker (new connection) |
+| `^B n` / `^B p` | next / previous tab |
+| `^B 1..9` | jump to tab N |
+| `^B x`    | close the current tab |
+| `^B s`    | toggle the current tab in the broadcast sync set |
+| `^B m`    | toggle minimal frame (clipboard-friendly chrome) |
+| `^B [`    | enter keyboard copy mode |
+| `^B u`    | open the SFTP file browser |
+| `^B :`    | open the command palette |
+| `^B ?`    | help overlay |
+| `^B q`    | quit mterm |
 
-### Codesign + notarize for macOS distribution
+Full reference — every chord, every overlay, every mode: **[docs/keybindings.md](docs/keybindings.md)**.
 
-Unsigned macOS binaries hit Gatekeeper and require a `xattr -d
-com.apple.quarantine` dance. If you have a Developer ID Application
-certificate, `build.sh` can codesign + notarize the darwin binaries so
-colleagues just unzip and run.
+## Building & distribution
 
-One-time keychain setup:
-
-```bash
-# Generate an app-specific password at
-# https://appleid.apple.com → Sign-In and Security → App-Specific Passwords.
-xcrun notarytool store-credentials mterm-notary \
-    --apple-id <your-apple-id> \
-    --team-id <10-char-team-id> \
-    --password <app-specific-password>
-```
-
-Build + sign + notarize:
-
-```bash
-export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
-export APPLE_KEYCHAIN_PROFILE="mterm-notary"
-./build.sh
-```
-
-Output goes to `dist/mterm-darwin-<arch>.zip` — that's the file to hand out.
-First launch on a colleague's machine does an online notarization check (~1s)
-then runs cleanly with no Gatekeeper prompt.
-
-To inspect what identities are available:
-
-```bash
-security find-identity -v -p codesigning
-```
-
-### macOS .pkg installer
-
-For a one-click install experience, `installer.sh` fuses the two darwin
-binaries into a universal binary, wraps it in a signed + notarized .pkg
-that drops `mterm` into `/usr/local/bin/`, and staples the notarization
-ticket. Colleagues double-click the .pkg, enter their password, then run
-`mterm` from any terminal afterward.
-
-Requires a Developer ID **Installer** certificate (different from the
-Application cert used above — Apple issues them separately):
-
-```bash
-# See your installer identities:
-security find-identity -v -p basic | grep "Developer ID Installer"
-
-# Then build + sign + notarize the installer:
-export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID)"
-export APPLE_INSTALLER_SIGNING_IDENTITY="Developer ID Installer: Your Name (TEAMID)"
-export APPLE_KEYCHAIN_PROFILE="mterm-notary"
-./build.sh && ./installer.sh
-```
-
-Output: `dist/mterm-installer.pkg` (~12 MiB; universal binary inside).
-
-Override defaults via:
-- `PKG_IDENTIFIER` (default `dev.mterm`) — reverse-DNS bundle id
-- `PKG_VERSION`  (default derived from `git describe`) — installer version
-
-Uninstall (for colleagues if asked):
-
-```bash
-sudo rm /usr/local/bin/mterm
-pkgutil --forget dev.mterm
-```
-
-### Debian / Ubuntu / Linux Mint .deb installer
-
-`debian.sh` wraps the cross-compiled Linux binaries into installable
-`.deb` packages — one per architecture. Colleagues install with `apt`
-or `dpkg`; mterm lands at `/usr/bin/mterm` so it's on PATH everywhere.
-
-```bash
-# macOS:  brew install dpkg
-# Linux:  already built in
-./build.sh && ./debian.sh
-```
-
-Output: `dist/mterm_<version>_amd64.deb` and `dist/mterm_<version>_arm64.deb`.
-
-The version string defaults to `git describe`; if there are no tags
-yet, the SHA is prefixed with `0.0.0+` so Debian's version parser
-accepts it. Override either piece via env vars when you ship:
-
-```bash
-DEB_VERSION=1.0.0 \
-DEB_MAINTAINER="Your Name <you@example.com>" \
-    ./debian.sh
-```
-
-Colleagues install:
-
-```bash
-sudo apt install ./mterm_<version>_amd64.deb   # or _arm64
-# or, equivalently with plain dpkg (no auto-deps; mterm has none):
-sudo dpkg -i mterm_<version>_amd64.deb
-```
-
-Uninstall:
-
-```bash
-sudo apt remove mterm    # or: sudo dpkg -r mterm
-```
-
-The .deb is not signed — for internal distribution this is fine, and
-the `SHA256SUMS` file in `dist/` covers integrity verification.
-Signing requires a Debian package-signing key and `dpkg-sig`;
-deferred until there's a reason to.
+Three scripts in the repo root: `build.sh` (cross-compile + signed darwin
+zips), `installer.sh` (universal macOS .pkg), `debian.sh` (.deb for
+amd64/arm64). Full guide including code-signing + notarization setup:
+**[docs/building.md](docs/building.md)**.
 
 ## License
 
