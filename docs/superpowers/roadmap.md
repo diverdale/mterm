@@ -97,6 +97,13 @@ delete, rename, multi-select, edit, and view-file.
 **Open:** Browser UX; drag-drop from host terminal; progress bar treatment; zmodem (rz/sz) auto-detection as a follow-on.
 **Depends on:** nothing.
 
+### Mode-aware mouse forwarding
+**What:** When the remote app turns on mouse tracking (DECSET `?1000`, `?1002`, `?1003`, `?1006`), forward mouse events — wheel, click, drag — to the remote as encoded SGR (`\x1b[<...M`) or legacy X10 sequences instead of consuming them locally. When tracking is off, keep today's behavior (wheel → mterm scrollback).
+**Why:** Without this, full-screen TUIs run over SSH — opencode, modern vim with `set mouse=a`, htop, ncdu, lazygit — are crippled. Wheel events go to mterm's local scrollback instead of the app the user is looking at. Surfaced during dogfood on opencode-over-SSH.
+**Size:** M
+**Open:** Where to track the DECSET state — likely a small addition to `internal/terminal` exposing an `IsMouseTracked()` flag the app can query. Encoding flavor — start with SGR (1006) since it's the modern default and matches what every recent TUI emits; X10 only if a real terminal forces our hand. Whether to ship wheel-only first (fixes the opencode case in <100 LOC) or click+drag together (covers vim's full mouse mode).
+**Depends on:** `xvt` emulator surfacing the mouse-mode flag.
+
 ---
 
 ## Tier 2 — what makes mterm *better* than SecureCRT
@@ -154,12 +161,13 @@ delete, rename, multi-select, edit, and view-file.
 
 ## Tier 3 — polish that compounds
 
-### True color + mouse + copy-on-select
-**What:** 24-bit color passthrough; forward mouse events to the VT; selection auto-copies to system clipboard (OSC52 + native fallback).
+### True color + copy-on-select
+**What:** 24-bit color passthrough; selection auto-copies to system clipboard (OSC52 + native fallback).
 **Why:** Modern terminal expectations.
 **Size:** M
 **Open:** OSC52 only (works over SSH) vs also native `pbcopy`/`xclip`.
 **Depends on:** nothing.
+**Note:** The "forward mouse events to the VT" piece of the original entry has been promoted to Tier 1 as a standalone — see [Mode-aware mouse forwarding](#mode-aware-mouse-forwarding).
 
 ### Per-host startup commands
 **What:** `on_connect: ["screen -DR work"]` in `hosts.yaml`; commands sent after handshake.
@@ -227,6 +235,7 @@ Roughly ordered by dependency + effort + bang-for-buck. Each is its own branch.
 3. **Per-session logging** (S–M) — unblocks trigger "log to file"
 4. **Broadcast input** (M) — the killer feature
 5. **Scrollback search** (M) — improves shipped copy mode
+5a. **Mode-aware mouse forwarding** (M) — unblocks opencode, vim mouse, htop over SSH
 6. **ProxyJump** (M) — unblocks every user behind a bastion
 7. **Per-host startup commands** (S) — quick add; enables Architecture B trivially
 8. **Detach/reattach via Architecture B** (M) — `auto_multiplex: tmux` config knob
@@ -235,7 +244,7 @@ Roughly ordered by dependency + effort + bang-for-buck. Each is its own branch.
 11. **Workspaces** — hostlist-only first (M)
 12. **SFTP file transfer** (L)
 13. **Triggers** (L)
-14. **True color + mouse + copy-on-select** (M)
+14. **True color + copy-on-select** (M) — mouse-forwarding split out to Tier 1
 15. **Configurable keymap** (M)
 16. **Pane splitting** (XL)
 17. **Detach/reattach via Architecture A — local daemon** (XL)
