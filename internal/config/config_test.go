@@ -490,6 +490,47 @@ hosts:
 	}
 }
 
+func TestLoadAndMergeProxyJumpFlowsThrough(t *testing.T) {
+	// `proxy_jump:` in hosts.yaml must reach config.Host.ProxyJump for both
+	// the flat and nested forms.
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`groups:
+  - name: Work
+    hosts:
+      - name: end-device
+        address: 10.0.0.5
+        proxy_jump: jump-host
+hosts:
+  - name: jump-host
+    address: jump.example.com
+  - name: literal-proxy
+    address: 10.0.0.6
+    proxy_jump: alice@bastion.example.com:2222
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", res.Warnings)
+	}
+	got := map[string]string{}
+	for _, h := range res.Hosts {
+		got[h.Name] = h.ProxyJump
+	}
+	want := map[string]string{
+		"end-device":    "jump-host",
+		"jump-host":     "",
+		"literal-proxy": "alice@bastion.example.com:2222",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ProxyJump map = %v, want %v", got, want)
+	}
+}
+
 func TestLoadAndMergeLogTriState(t *testing.T) {
 	// Default = on (nil Log → Logging() == true).
 	// Explicit log: false → off.

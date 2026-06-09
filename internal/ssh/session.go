@@ -46,6 +46,7 @@ type Session struct {
 	auth     AuthProvider
 	hostKey  ssh.HostKeyCallback
 	dialAddr string // host:port to dial; defaults to host.Addr()
+	proxy    *Session // optional jump host; closed when this session closes
 
 	mu       sync.Mutex
 	state    State
@@ -69,6 +70,17 @@ func NewSession(host config.Host, auth AuthProvider, hostKey ssh.HostKeyCallback
 		dialAddr: host.Addr(),
 		state:    StateConnecting,
 	}
+}
+
+// NewSessionVia builds an unconnected Session that will dial host through
+// the supplied proxy session. proxy must be already-connected before this
+// session's Connect runs (its underlying SSH client is what tunnels the
+// TCP conn for the target). The target session takes ownership of proxy:
+// Close on this session closes proxy too.
+func NewSessionVia(host config.Host, auth AuthProvider, hostKey ssh.HostKeyCallback, proxy *Session) *Session {
+	s := NewSession(host, auth, hostKey)
+	s.proxy = proxy
+	return s
 }
 
 // Host returns the session's host definition.
@@ -123,7 +135,7 @@ func (s *Session) Connect(cols, rows int) error {
 		Timeout:         10 * time.Second,
 	}
 
-	client, err := ssh.Dial("tcp", s.dialAddr, cfg)
+	client, err := s.dialClient(cfg)
 	if err != nil {
 		s.setState(StateFailed, err)
 		return err
@@ -180,6 +192,42 @@ func (s *Session) Connect(cols, rows int) error {
 	return nil
 }
 
+// dialClient opens an *ssh.Client to s.dialAddr. When s.proxy is set, the
+// TCP conn is tunneled through the proxy's existing SSH client before the
+// target handshake; otherwise a direct net.Dial is used. The split mirrors
+// ssh.Dial's own implementation but lets us substitute the conn source.
+func (s *Session) dialClient(cfg *ssh.ClientConfig) (*ssh.Client, error) {
+	if s.proxy == nil {
+		return ssh.Dial("tcp", s.dialAddr, cfg)
+	}
+	s.proxy.mu.Lock()
+	proxyClient := s.proxy.client
+	s.proxy.mu.Unlock()
+	if proxyClient == nil {
+		return nil, fmt.Errorf("proxy session not connected")
+	}
+	conn, err := proxyClient.Dial("tcp", s.dialAddr)
+	if err != nil {
+		return nil, fmt.Errorf("proxy dial %s: %w", s.dialAddr, err)
+	}
+	// Apply the handshake timeout manually since ssh.NewClientConn doesn't
+	// respect cfg.Timeout the way ssh.Dial does.
+	if cfg.Timeout > 0 {
+		_ = conn.SetDeadline(time.Now().Add(cfg.Timeout))
+	}
+	clientConn, chans, reqs, err := ssh.NewClientConn(conn, s.dialAddr, cfg)
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("proxy handshake %s: %w", s.dialAddr, err)
+	}
+	// Clear the deadline once the handshake's done; otherwise keepalives /
+	// long-idle reads would fail.
+	if cfg.Timeout > 0 {
+		_ = conn.SetDeadline(time.Time{})
+	}
+	return ssh.NewClient(clientConn, chans, reqs), nil
+}
+
 // Write sends bytes to the remote shell's stdin.
 func (s *Session) Write(p []byte) (int, error) {
 	s.mu.Lock()
@@ -214,10 +262,12 @@ func (s *Session) Resize(cols, rows int) error {
 }
 
 // Close terminates the session; it will not auto-reconnect afterward.
+// When the session was opened via a jump host (NewSessionVia), the proxy
+// session is also closed so the chain tears down completely.
 func (s *Session) Close() error {
 	s.mu.Lock()
 	s.closed = true
-	sess, client := s.sess, s.client
+	sess, client, proxy := s.sess, s.client, s.proxy
 	s.sess, s.client, s.stdin, s.stdout = nil, nil, nil, nil
 	s.state = StateClosed
 	forwards := s.forwards
@@ -230,10 +280,16 @@ func (s *Session) Close() error {
 	if sess != nil {
 		sess.Close()
 	}
+	var firstErr error
 	if client != nil {
-		return client.Close()
+		firstErr = client.Close()
 	}
-	return nil
+	if proxy != nil {
+		if err := proxy.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 // userClosed reports whether Close was called.

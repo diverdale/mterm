@@ -114,25 +114,53 @@ func run() error {
 	}
 	knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
 
-	connect := func(host config.Host, cols, rows int) (*mssh.Session, error) {
-		// v1: trust-on-first-use accepts unknown keys automatically. A future
-		// version routes this through an interactive modal.
-		verifier := mssh.NewHostKeyVerifier(knownHostsPath,
-			func(string, gossh.PublicKey) bool { return true })
-
-		// Build the per-host auth chain. IdentityFile (from hosts.yaml or
-		// ssh_config) is tried first when set, then the agent — matches
-		// `ssh`'s own fallback order and means a reboot-cleared agent
-		// doesn't break auth when a key is also on disk.
+	// buildAuth assembles the same auth chain mterm uses for any direct
+	// dial: identityfile first (when set), then the shared agent provider.
+	buildAuth := func(host config.Host) mssh.AuthProvider {
 		providers := []mssh.AuthProvider{}
 		if host.IdentityFile != "" {
 			providers = append(providers, mssh.NewIdentityFileProvider(host.IdentityFile))
 		}
 		providers = append(providers, auth)
-		hostAuth := mssh.ChainProvider(providers...)
+		return mssh.ChainProvider(providers...)
+	}
+	// v1: trust-on-first-use accepts unknown keys automatically. A future
+	// version routes this through an interactive modal.
+	hostKeyCallback := func() gossh.HostKeyCallback {
+		v := mssh.NewHostKeyVerifier(knownHostsPath,
+			func(string, gossh.PublicKey) bool { return true })
+		return v.Callback()
+	}
 
-		sess := mssh.NewSession(host, hostAuth, verifier.Callback())
+	connect := func(host config.Host, cols, rows int) (*mssh.Session, error) {
+		// Resolve a `proxy_jump:` value (alias or literal) into a Host we
+		// can dial. Empty value → nil proxy → straight-through dial.
+		proxyHost, err := config.ResolveProxyJump(host.ProxyJump, res.Hosts)
+		if err != nil {
+			return nil, fmt.Errorf("proxy_jump for %s: %w", host.Name, err)
+		}
+
+		if proxyHost == nil {
+			sess := mssh.NewSession(host, buildAuth(host), hostKeyCallback())
+			if err := sess.Connect(cols, rows); err != nil {
+				return nil, err
+			}
+			return sess, nil
+		}
+
+		// Two-hop dial: bring up the jump session first, then tunnel the
+		// target SSH conn through it. Any failure on the proxy aborts
+		// before the target dial.
+		proxySess := mssh.NewSession(*proxyHost, buildAuth(*proxyHost), hostKeyCallback())
+		// The proxy doesn't get a user-visible PTY (we never read/write
+		// its shell). 80x24 is enough to satisfy the handshake.
+		if err := proxySess.Connect(80, 24); err != nil {
+			return nil, fmt.Errorf("dial jump host %s: %w", proxyHost.Name, err)
+		}
+		sess := mssh.NewSessionVia(host, buildAuth(host), hostKeyCallback(), proxySess)
 		if err := sess.Connect(cols, rows); err != nil {
+			// Tear down the proxy too — target ownership hasn't transferred yet.
+			_ = proxySess.Close()
 			return nil, err
 		}
 		return sess, nil

@@ -52,8 +52,8 @@ type Host struct {
 	Group        string
 	Tags         []string
 	Source       Source
-	IdentityFile string // parsed now, used when key-file auth lands
-	ProxyJump    string // parsed now, used when jump-host support lands
+	IdentityFile string // path to a private key file; tried before the agent
+	ProxyJump    string // jump host: alias resolved against the registry, OR a literal user@host:port
 	Forwards     []Forward
 	BorderColor  string // hex like "#RRGGBB" or "#RGB"; "" = no override
 

@@ -74,8 +74,12 @@ The `~/.config/mterm/` directory is created automatically on first run.
 - **Per-session output logging** to `~/.config/mterm/logs/<host>/<timestamp>.log`
   (default on; per-host opt-out)
 - **Command palette** (`^B :`) with fuzzy command search;
-  **help overlay** (`^B ?`); **port-forwarding panel** (`^B f`);
-  **auto-reconnect** on transport failure
+  **help overlay** (`^B ?`); **port-forwarding panel** (`^B f`, UI only —
+  toggles don't open real forwards yet); **auto-reconnect** on transport
+  failure
+- **ProxyJump (jump host) support** — set `proxy_jump:` on a host in
+  hosts.yaml (or use `ProxyJump` in `~/.ssh/config`); mterm tunnels the
+  target SSH conn through the jump host transparently. Single hop in v1.
 
 ## File browser (`^B u`)
 
@@ -190,6 +194,7 @@ rather than being silently dropped.
 | `bordercolor` | string    | (theme accent)| Hex `#RRGGBB`/`#RGB` OR a named color (see [Color names](#color-names)). When this host's tab is active, the window frame, active tab chip, footer key hints, and `user@host:port` segment all use this color. Invalid values warn and are ignored. |
 | `identityfile`| string    | (none)        | Path to an SSH private key file. Tried *before* the agent, mimicking `ssh`'s fallback. `~/` and `$HOME` are expanded. Encrypted keys are not supported — load those via `ssh-add --apple-use-keychain` instead. |
 | `on_connect`  | []string  | (none)        | Shell commands to send to the remote after handshake. Each gets a trailing CR. Common uses: auto-attach to tmux/screen (`tmux new -A -s mterm-$USER`), `cd` into a working dir. |
+| `proxy_jump`  | string    | (none)        | Jump host to dial through. Two forms: (a) the **name** of another host in your registry (`proxy_jump: bastion`) — mterm uses that host's full config (port, identityfile, etc.); (b) a literal `[user@]host[:port]` (`proxy_jump: alice@bastion.example.com:2222`). Single-hop chains only in v1. ssh_config's `ProxyJump` is also honored; hosts.yaml wins on overlap. |
 | `log`         | bool      | `true`        | Set `false` to opt out of per-session output logging for this host. |
 
 ### Forward fields
@@ -328,6 +333,14 @@ groups:
                 bindport: 8080
                 dialaddr: 127.0.0.1
                 dialport: 80
+          - name: caged-router
+            address: 10.20.0.42       # only reachable via lab-bastion
+            user: admin
+            proxy_jump: lab-bastion   # SSH dial tunnels through the jump host
+          - name: end-device-quick
+            address: 10.20.0.43
+            user: admin
+            proxy_jump: alice@198.51.100.1:2222  # one-off literal: user@host:port
       - name: Vendors
         hosts:
           - name: vendor-switch-01

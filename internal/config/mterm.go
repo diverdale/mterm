@@ -52,6 +52,7 @@ type mtermHost struct {
 	BorderColor  string         `yaml:"bordercolor"`
 	IdentityFile string         `yaml:"identityfile"` // ~ and $HOME expanded at connect time
 	OnConnect    []string       `yaml:"on_connect"`   // commands run after handshake
+	ProxyJump    string         `yaml:"proxy_jump"`   // jump host alias OR user@host:port literal
 	Log          *bool          `yaml:"log"`          // nil = default-on; false = opt-out
 
 	// intentOrder is the loader-assigned sequence number used to preserve

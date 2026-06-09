@@ -215,6 +215,9 @@ func applyOverlay(h *Host, mh mtermHost) {
 	if mh.BorderColor != "" {
 		h.BorderColor = mh.BorderColor
 	}
+	if mh.ProxyJump != "" {
+		h.ProxyJump = mh.ProxyJump
+	}
 	if mh.IdentityFile != "" {
 		h.IdentityFile = mh.IdentityFile
 	}
@@ -251,6 +254,7 @@ func hostFromMterm(mh mtermHost) Host {
 		BorderColor:  mh.BorderColor,
 		IdentityFile: mh.IdentityFile,
 		OnConnect:    mh.OnConnect,
+		ProxyJump:    mh.ProxyJump,
 		Log:          mh.Log,
 		intentOrder:  mh.intentOrder,
 	}

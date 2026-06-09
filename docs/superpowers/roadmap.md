@@ -37,6 +37,9 @@ XL ≈ structural change to the app, multiple branches.
 - `^B [` keyboard copy mode — vim-style scrollback navigation, line-range
   selection with `v` mark + Enter, OSC 52 + native (pbcopy/wl-copy/xclip)
   fallback delivery; frame chars never enter the payload
+- ProxyJump support — `proxy_jump:` in hosts.yaml (alias or
+  `[user@]host[:port]` literal) + `ProxyJump` from ssh_config; mterm
+  tunnels the target SSH conn through the jump host, single hop in v1
 
 ---
 
@@ -76,12 +79,14 @@ Follow-ons left on the table:
 **Open:** Regex vs substring default; case-insensitivity toggle.
 **Depends on:** existing copy mode (already shipped).
 
-### ProxyJump / bastion support
-**What:** Honor `ProxyJump` from `~/.ssh/config` and a `proxy_jump:` field in `hosts.yaml`.
-**Why:** Corporate networks live behind bastions — without this, mterm can't reach the targets that matter.
-**Size:** M
-**Open:** Multi-hop chains (rare) vs single hop (covers ~95%).
-**Depends on:** nothing. `golang.org/x/crypto/ssh` supports Dial-over-conn already.
+### ProxyJump / bastion support ✓ shipped
+`proxy_jump:` in `hosts.yaml` and `ProxyJump` from `~/.ssh/config` are
+both honored. Value is either a registry alias (looked up against the
+merged host list — uses that host's identityfile, port, etc.) or a
+literal `[user@]host[:port]`. mterm dials the jump host, then tunnels
+the target SSH conn through it (`golang.org/x/crypto/ssh` Dial-over-conn).
+Single hop only in v1 — multi-hop chains (rare) deferred. Close on the
+target session cascades through the proxy.
 
 ### File transfer (SFTP) ✓ shipped
 Two-pane file browser via `^B u`. Live progress + cancel during copies.
@@ -236,7 +241,6 @@ Roughly ordered by dependency + effort + bang-for-buck. Each is its own branch.
 4. **Broadcast input** (M) — the killer feature
 5. **Scrollback search** (M) — improves shipped copy mode
 5a. **Mode-aware mouse forwarding** (M) — unblocks opencode, vim mouse, htop over SSH
-6. **ProxyJump** (M) — unblocks every user behind a bastion
 7. **Per-host startup commands** (S) — quick add; enables Architecture B trivially
 8. **Detach/reattach via Architecture B** (M) — `auto_multiplex: tmux` config knob
 9. **Snippets** (M)
