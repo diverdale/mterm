@@ -62,6 +62,17 @@ func loadAndMerge(sshPath, mtermPath string, colors map[string]string) (*Result,
 		res.Warnings = append(res.Warnings, fmt.Sprintf("mterm config: %v", err))
 	}
 
+	// Plaintext passwords live in this file; if it's group- or world-readable,
+	// warn loudly. Skip on missing file (no secrets to leak) and on non-regular
+	// special files (sockets, devices) — we only care about the regular config.
+	if mf != nil && hasPlaintextSecrets(mf) {
+		if perm, ok := readableByOthers(mtermPath); ok {
+			res.Warnings = append(res.Warnings,
+				fmt.Sprintf("mterm config: %s contains plaintext password(s) but is mode %#o "+
+					"(group/world readable) — chmod 600", mtermPath, perm))
+		}
+	}
+
 	// 1. Gather yaml-declared hosts in declaration order.
 	var yamlHosts []mtermHost
 	counter := 0
@@ -218,6 +229,12 @@ func applyOverlay(h *Host, mh mtermHost) {
 	if mh.ProxyJump != "" {
 		h.ProxyJump = mh.ProxyJump
 	}
+	if mh.Password != "" {
+		h.Password = mh.Password
+	}
+	if mh.PasswordCommand != "" {
+		h.PasswordCommand = mh.PasswordCommand
+	}
 	if mh.IdentityFile != "" {
 		h.IdentityFile = mh.IdentityFile
 	}
@@ -252,10 +269,55 @@ func hostFromMterm(mh mtermHost) Host {
 		Source:       SourceMterm,
 		Forwards:     forwards,
 		BorderColor:  mh.BorderColor,
-		IdentityFile: mh.IdentityFile,
-		OnConnect:    mh.OnConnect,
-		ProxyJump:    mh.ProxyJump,
-		Log:          mh.Log,
-		intentOrder:  mh.intentOrder,
+		IdentityFile:    mh.IdentityFile,
+		OnConnect:       mh.OnConnect,
+		ProxyJump:       mh.ProxyJump,
+		Password:        mh.Password,
+		PasswordCommand: mh.PasswordCommand,
+		Log:             mh.Log,
+		intentOrder:     mh.intentOrder,
 	}
+}
+
+// hasPlaintextSecrets reports whether the loaded mterm config carries any
+// literal `password:` entry. `password_command:` is not a secret on disk
+// — the command runs at connect time and the credential never touches the
+// yaml.
+func hasPlaintextSecrets(mf *mtermFile) bool {
+	for _, h := range mf.Hosts {
+		if h.Password != "" {
+			return true
+		}
+	}
+	return groupsHavePlaintextSecrets(mf.Groups)
+}
+
+func groupsHavePlaintextSecrets(groups []mtermGroup) bool {
+	for _, g := range groups {
+		for _, h := range g.Hosts {
+			if h.Password != "" {
+				return true
+			}
+		}
+		if groupsHavePlaintextSecrets(g.Groups) {
+			return true
+		}
+	}
+	return false
+}
+
+// readableByOthers reports whether path is a regular file readable by
+// group or world. Returns (perm-bits, true) when a warning is warranted,
+// or (0, false) otherwise (file missing, special file, or 0600-style
+// owner-only).
+func readableByOthers(path string) (os.FileMode, bool) {
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return 0, false
+	}
+	perm := info.Mode().Perm()
+	if perm&0o077 != 0 {
+		return perm, true
+	}
+	return 0, false
 }

@@ -114,14 +114,25 @@ func run() error {
 	}
 	knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
 
-	// buildAuth assembles the same auth chain mterm uses for any direct
-	// dial: identityfile first (when set), then the shared agent provider.
+	// buildAuth assembles the per-host auth chain:
+	//   identityfile  (when set)   tried first — mimics ssh's preference
+	//   agent         (shared)     covers most modern setups
+	//   password_command            evaluated lazily; for vault / 1password etc
+	//   password                   plaintext literal — last-resort fallback
+	// Earlier methods that fail (wrong key, locked agent) flow through to
+	// the next so a host with stale agent state still connects.
 	buildAuth := func(host config.Host) mssh.AuthProvider {
 		providers := []mssh.AuthProvider{}
 		if host.IdentityFile != "" {
 			providers = append(providers, mssh.NewIdentityFileProvider(host.IdentityFile))
 		}
 		providers = append(providers, auth)
+		if host.PasswordCommand != "" {
+			providers = append(providers, mssh.NewPasswordCommandProvider(host.PasswordCommand))
+		}
+		if host.Password != "" {
+			providers = append(providers, mssh.NewPasswordProvider(host.Password))
+		}
 		return mssh.ChainProvider(providers...)
 	}
 	// v1: trust-on-first-use accepts unknown keys automatically. A future

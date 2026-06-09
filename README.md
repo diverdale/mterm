@@ -80,6 +80,10 @@ The `~/.config/mterm/` directory is created automatically on first run.
 - **ProxyJump (jump host) support** — set `proxy_jump:` on a host in
   hosts.yaml (or use `ProxyJump` in `~/.ssh/config`); mterm tunnels the
   target SSH conn through the jump host transparently. Single hop in v1.
+- **Password auth for network gear** — `password:` literal or
+  `password_command:` (1Password / `pass` / vault) for switches and
+  routers that don't speak `authorized_keys`. Tried after identityfile +
+  agent so existing key flows are unaffected.
 
 ## File browser (`^B u`)
 
@@ -195,6 +199,8 @@ rather than being silently dropped.
 | `identityfile`| string    | (none)        | Path to an SSH private key file. Tried *before* the agent, mimicking `ssh`'s fallback. `~/` and `$HOME` are expanded. Encrypted keys are not supported — load those via `ssh-add --apple-use-keychain` instead. |
 | `on_connect`  | []string  | (none)        | Shell commands to send to the remote after handshake. Each gets a trailing CR. Common uses: auto-attach to tmux/screen (`tmux new -A -s mterm-$USER`), `cd` into a working dir. |
 | `proxy_jump`  | string    | (none)        | Jump host to dial through. Two forms: (a) the **name** of another host in your registry (`proxy_jump: bastion`) — mterm uses that host's full config (port, identityfile, etc.); (b) a literal `[user@]host[:port]` (`proxy_jump: alice@bastion.example.com:2222`). Single-hop chains only in v1. ssh_config's `ProxyJump` is also honored; hosts.yaml wins on overlap. |
+| `password`        | string | (none) | **Plaintext** password literal. Tried after identityfile + agent. Useful for network gear (Cisco / Arista / Juniper) where `authorized_keys` doesn't exist. **Security:** mterm warns at startup if `hosts.yaml` is group/world-readable while this field is set — `chmod 600 ~/.config/mterm/hosts.yaml`. Prefer `password_command:` for production. |
+| `password_command`| string | (none) | Shell command whose trimmed stdout is the password. Runs at connect time so the credential is never on disk. Examples: `op read 'op://Work/Switch Fleet/password'` (1Password CLI), `pass show network/admin` (passwordstore), `bw get password switch-fleet`. Tried before the `password:` literal. |
 | `log`         | bool      | `true`        | Set `false` to opt out of per-session output logging for this host. |
 
 ### Forward fields
@@ -337,10 +343,12 @@ groups:
             address: 10.20.0.42       # only reachable via lab-bastion
             user: admin
             proxy_jump: lab-bastion   # SSH dial tunnels through the jump host
+            password_command: "op read 'op://Work/Lab Routers/password'"  # 1Password lookup
           - name: end-device-quick
             address: 10.20.0.43
             user: admin
             proxy_jump: alice@198.51.100.1:2222  # one-off literal: user@host:port
+            password: hunter2         # plaintext fallback for quick tests (chmod 600 the file)
       - name: Vendors
         hosts:
           - name: vendor-switch-01

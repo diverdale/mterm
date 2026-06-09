@@ -52,8 +52,10 @@ type Host struct {
 	Group        string
 	Tags         []string
 	Source       Source
-	IdentityFile string // path to a private key file; tried before the agent
-	ProxyJump    string // jump host: alias resolved against the registry, OR a literal user@host:port
+	IdentityFile    string // path to a private key file; tried before the agent
+	ProxyJump       string // jump host: alias resolved against the registry, OR a literal user@host:port
+	Password        string // password literal — plaintext, last in the auth chain
+	PasswordCommand string // command whose trimmed stdout supplies the password (preferred over Password)
 	Forwards     []Forward
 	BorderColor  string // hex like "#RRGGBB" or "#RGB"; "" = no override
 

@@ -50,10 +50,12 @@ type mtermHost struct {
 	Tags         []string       `yaml:"tags"`
 	Forwards     []mtermForward `yaml:"forwards"`
 	BorderColor  string         `yaml:"bordercolor"`
-	IdentityFile string         `yaml:"identityfile"` // ~ and $HOME expanded at connect time
-	OnConnect    []string       `yaml:"on_connect"`   // commands run after handshake
-	ProxyJump    string         `yaml:"proxy_jump"`   // jump host alias OR user@host:port literal
-	Log          *bool          `yaml:"log"`          // nil = default-on; false = opt-out
+	IdentityFile    string   `yaml:"identityfile"`     // ~ and $HOME expanded at connect time
+	OnConnect       []string `yaml:"on_connect"`       // commands run after handshake
+	ProxyJump       string   `yaml:"proxy_jump"`       // jump host alias OR user@host:port literal
+	Password        string   `yaml:"password"`         // last-resort literal credential — plaintext, see security notes
+	PasswordCommand string   `yaml:"password_command"` // shell command whose trimmed stdout is the password
+	Log             *bool    `yaml:"log"`              // nil = default-on; false = opt-out
 
 	// intentOrder is the loader-assigned sequence number used to preserve
 	// yaml declaration order during sort. Not a yaml field — set during

@@ -531,6 +531,111 @@ hosts:
 	}
 }
 
+func TestLoadAndMergePasswordFieldsFlowThrough(t *testing.T) {
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: literal-pw
+    address: 10.0.0.1
+    password: hunter2
+  - name: command-pw
+    address: 10.0.0.2
+    password_command: "op read 'op://vault/host/password'"
+  - name: both
+    address: 10.0.0.3
+    password: fallback
+    password_command: "echo vaultpw"
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", res.Warnings)
+	}
+	got := map[string][2]string{}
+	for _, h := range res.Hosts {
+		got[h.Name] = [2]string{h.Password, h.PasswordCommand}
+	}
+	want := map[string][2]string{
+		"literal-pw": {"hunter2", ""},
+		"command-pw": {"", "op read 'op://vault/host/password'"},
+		"both":       {"fallback", "echo vaultpw"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("password fields = %v, want %v", got, want)
+	}
+}
+
+func TestLoadAndMergePlaintextPasswordWarnsOnLoosePerms(t *testing.T) {
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: switchy
+    address: 10.0.0.1
+    password: hunter2
+`), 0o644); err != nil { // group/world readable
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "plaintext password") && strings.Contains(w, "chmod 600") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("want plaintext-password perms warning, got warnings: %v", res.Warnings)
+	}
+}
+
+func TestLoadAndMergePlaintextPasswordSilentOnTightPerms(t *testing.T) {
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: switchy
+    address: 10.0.0.1
+    password: hunter2
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "plaintext password") {
+			t.Fatalf("0600 file should not warn about plaintext password: %q", w)
+		}
+	}
+}
+
+func TestLoadAndMergePasswordCommandNeverTriggersPermsWarning(t *testing.T) {
+	dir := t.TempDir()
+	mtermPath := filepath.Join(dir, "hosts.yaml")
+	if err := os.WriteFile(mtermPath, []byte(`hosts:
+  - name: switchy
+    address: 10.0.0.1
+    password_command: "op read 'op://Work/x'"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := loadAndMerge("", mtermPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "plaintext password") {
+			t.Fatalf("password_command must not trigger plaintext warning: %q", w)
+		}
+	}
+}
+
 func TestLoadAndMergeLogTriState(t *testing.T) {
 	// Default = on (nil Log → Logging() == true).
 	// Explicit log: false → off.

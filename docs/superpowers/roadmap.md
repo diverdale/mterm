@@ -40,6 +40,11 @@ XL ≈ structural change to the app, multiple branches.
 - ProxyJump support — `proxy_jump:` in hosts.yaml (alias or
   `[user@]host[:port]` literal) + `ProxyJump` from ssh_config; mterm
   tunnels the target SSH conn through the jump host, single hop in v1
+- Password auth for hosts without `authorized_keys` (network gear etc.):
+  `password:` literal (plaintext, mterm warns at startup if hosts.yaml
+  is group/world-readable) and `password_command:` (vault / 1Password /
+  `pass` integration). Registers password + keyboard-interactive both
+  so Arista/Juniper/Cisco gear all auth cleanly
 
 ---
 
