@@ -19,13 +19,31 @@ type pickerChosenMsg struct{ host config.Host }
 // pickerCancelledMsg is emitted when the user dismisses the picker.
 type pickerCancelledMsg struct{}
 
+type pickerRowKind int
+
+const (
+	pickerRowGroup pickerRowKind = iota
+	pickerRowHost
+)
+
+type pickerRow struct {
+	kind  pickerRowKind
+	path  string // group path for headers; "" for hosts
+	label string // display segment for headers
+	depth int
+	count int
+	host  config.Host
+}
+
 // picker is the fuzzy host-selection view.
 type picker struct {
-	all    []config.Host
-	query  string
-	cursor int
-	w, h   int
-	deco   pickerDecorations
+	all            []config.Host
+	query          string
+	cursor         int
+	collapsed      map[string]bool
+	savedCollapsed map[string]bool
+	w, h           int // w = content width; h = terminal height (0 = unconstrained)
+	deco           pickerDecorations
 }
 
 // pickerDecorations is the per-render context the App injects into the
@@ -39,18 +57,47 @@ type pickerDecorations struct {
 }
 
 func newPicker(hosts []config.Host) *picker {
-	return &picker{all: hosts}
+	return &picker{
+		all:       hosts,
+		collapsed: map[string]bool{},
+	}
 }
 
-func (p *picker) setSize(w, h int) { p.w, p.h = w, h }
+func (p *picker) setSize(w, termH int) { p.w, p.h = w, termH }
 
 // setDecorations is called by App.View() each render — cheap (just pointer
 // copies of the deco maps) so the picker always sees current state.
 func (p *picker) setDecorations(d pickerDecorations) { p.deco = d }
 
+func cloneCollapsed(m map[string]bool) map[string]bool {
+	if m == nil {
+		return map[string]bool{}
+	}
+	out := make(map[string]bool, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
 func (p *picker) setQuery(q string) {
+	old := p.query
 	p.query = q
 	p.cursor = 0
+	if old == "" && q != "" {
+		p.savedCollapsed = cloneCollapsed(p.collapsed)
+	}
+	if old != "" && q == "" && p.savedCollapsed != nil {
+		p.collapsed = cloneCollapsed(p.savedCollapsed)
+		p.savedCollapsed = nil
+	}
+}
+
+func (p *picker) effectiveCollapsed() map[string]bool {
+	if p.query != "" {
+		return map[string]bool{}
+	}
+	return p.collapsed
 }
 
 // visibleHosts returns hosts matching the current query (case-insensitive
@@ -76,22 +123,213 @@ func hostMatches(h config.Host, q string) bool {
 	return strings.Contains(hay, q)
 }
 
-// selected returns the host under the cursor, if any.
-func (p *picker) selected() (config.Host, bool) {
-	v := p.visibleHosts()
-	if len(v) == 0 || p.cursor < 0 || p.cursor >= len(v) {
-		return config.Host{}, false
+func hostGroupSegments(h config.Host) []string {
+	segs := config.GroupSegments(h.Group)
+	if len(segs) == 0 {
+		return []string{"ungrouped"}
 	}
-	return v[p.cursor], true
+	return segs
 }
 
-func (p *picker) moveCursor(delta int) {
-	v := p.visibleHosts()
-	if len(v) == 0 {
+func groupPath(segs []string, level int) string {
+	return strings.Join(segs[:level+1], "/")
+}
+
+func isAnyPrefixCollapsed(collapsed map[string]bool, segs []string) bool {
+	path := ""
+	for _, s := range segs {
+		if path == "" {
+			path = s
+		} else {
+			path = path + "/" + s
+		}
+		if collapsed[path] {
+			return true
+		}
+	}
+	return false
+}
+
+func prefixCounts(hosts []config.Host) map[string]int {
+	counts := map[string]int{}
+	for _, h := range hosts {
+		segs := hostGroupSegments(h)
+		path := ""
+		for _, s := range segs {
+			if path == "" {
+				path = s
+			} else {
+				path = path + "/" + s
+			}
+			counts[path]++
+		}
+	}
+	return counts
+}
+
+// buildRows constructs the visible picker row list from filtered hosts and
+// collapse state.
+func buildRows(hosts []config.Host, collapsed map[string]bool) []pickerRow {
+	if len(hosts) == 0 {
+		return nil
+	}
+	counts := prefixCounts(hosts)
+	var rows []pickerRow
+	var prev []string
+	for _, h := range hosts {
+		segs := hostGroupSegments(h)
+		hidden := isAnyPrefixCollapsed(collapsed, segs)
+		common := config.CommonPrefixLen(prev, segs)
+		for level := common; level < len(segs); level++ {
+			if level > 0 {
+				parentPath := groupPath(segs, level-1)
+				if collapsed[parentPath] {
+					break
+				}
+			}
+			path := groupPath(segs, level)
+			rows = append(rows, pickerRow{
+				kind:  pickerRowGroup,
+				path:  path,
+				label: segs[level],
+				depth: level,
+				count: counts[path],
+			})
+			if collapsed[path] {
+				break
+			}
+		}
+		if !hidden {
+			rows = append(rows, pickerRow{
+				kind:  pickerRowHost,
+				depth: len(segs),
+				host:  h,
+			})
+		}
+		prev = segs
+	}
+	return rows
+}
+
+func (p *picker) visibleRows() []pickerRow {
+	return buildRows(p.visibleHosts(), p.effectiveCollapsed())
+}
+
+func (p *picker) cursorRow() *pickerRow {
+	rows := p.visibleRows()
+	if p.cursor < 0 || p.cursor >= len(rows) {
+		return nil
+	}
+	return &rows[p.cursor]
+}
+
+func rowIdentifier(r pickerRow) string {
+	if r.kind == pickerRowGroup {
+		return "g:" + r.path
+	}
+	return "h:" + r.host.Name
+}
+
+func (p *picker) clampCursor() {
+	rows := p.visibleRows()
+	if len(rows) == 0 {
 		p.cursor = 0
 		return
 	}
-	p.cursor = (p.cursor + delta + len(v)) % len(v)
+	if p.cursor >= len(rows) {
+		p.cursor = len(rows) - 1
+	}
+	if p.cursor < 0 {
+		p.cursor = 0
+	}
+}
+
+func (p *picker) setCollapsed(path string, collapsed bool) {
+	oldRows := p.visibleRows()
+	oldID := ""
+	if p.cursor >= 0 && p.cursor < len(oldRows) {
+		oldID = rowIdentifier(oldRows[p.cursor])
+	}
+
+	if collapsed {
+		p.collapsed[path] = true
+	} else {
+		delete(p.collapsed, path)
+	}
+
+	newRows := p.visibleRows()
+	if len(newRows) == 0 {
+		p.cursor = 0
+		return
+	}
+	if oldID != "" {
+		for i, r := range newRows {
+			if rowIdentifier(r) == oldID {
+				p.cursor = i
+				return
+			}
+		}
+	}
+	for i, r := range newRows {
+		if r.kind == pickerRowGroup && r.path == path {
+			p.cursor = i
+			return
+		}
+	}
+	p.clampCursor()
+}
+
+func (p *picker) toggleCollapsed(path string) {
+	p.setCollapsed(path, !p.collapsed[path])
+}
+
+func (p *picker) collapse(path string) {
+	if p.collapsed[path] {
+		return
+	}
+	p.setCollapsed(path, true)
+}
+
+func (p *picker) expand(path string) {
+	if !p.collapsed[path] {
+		return
+	}
+	p.setCollapsed(path, false)
+}
+
+// selected returns the host under the cursor, if the cursor is on a host row.
+func (p *picker) selected() (config.Host, bool) {
+	row := p.cursorRow()
+	if row == nil || row.kind != pickerRowHost {
+		return config.Host{}, false
+	}
+	return row.host, true
+}
+
+func (p *picker) moveCursor(delta int) {
+	rows := p.visibleRows()
+	if len(rows) == 0 {
+		p.cursor = 0
+		return
+	}
+	p.cursor = (p.cursor + delta + len(rows)) % len(rows)
+}
+
+// pickerBodyChrome is non-row vertical space inside the framed body: search
+// line, blank line, and two optional truncation-indicator slots.
+const pickerBodyChrome = 4
+
+// maxVisibleRows is how many picker rows fit in the window body.
+func (p *picker) maxVisibleRows() int {
+	if p.h <= 0 {
+		return 0
+	}
+	bodyH := p.h - 4 // renderWindow body budget (title + divider + footer + bottom)
+	rows := bodyH - pickerBodyChrome
+	if rows < 3 {
+		rows = 3
+	}
+	return rows
 }
 
 // Update handles picker key events. It returns a command carrying a
@@ -99,6 +337,10 @@ func (p *picker) moveCursor(delta int) {
 func (p *picker) Update(msg tea.KeyMsg) tea.Cmd {
 	switch msg.Type {
 	case tea.KeyEnter:
+		if row := p.cursorRow(); row != nil && row.kind == pickerRowGroup {
+			p.toggleCollapsed(row.path)
+			return nil
+		}
 		if h, ok := p.selected(); ok {
 			return func() tea.Msg { return pickerChosenMsg{host: h} }
 		}
@@ -112,12 +354,24 @@ func (p *picker) Update(msg tea.KeyMsg) tea.Cmd {
 		p.moveCursor(-1)
 	case tea.KeyCtrlJ:
 		p.moveCursor(1)
+	case tea.KeyLeft:
+		if row := p.cursorRow(); row != nil && row.kind == pickerRowGroup {
+			p.collapse(row.path)
+		}
+	case tea.KeyRight:
+		if row := p.cursorRow(); row != nil && row.kind == pickerRowGroup {
+			p.expand(row.path)
+		}
 	case tea.KeyBackspace:
 		if p.query != "" {
 			runes := []rune(p.query)
 			p.setQuery(string(runes[:len(runes)-1]))
 		}
-	case tea.KeyRunes, tea.KeySpace:
+	case tea.KeySpace:
+		if row := p.cursorRow(); row != nil && row.kind == pickerRowGroup {
+			p.toggleCollapsed(row.path)
+		}
+	case tea.KeyRunes:
 		p.setQuery(p.query + string(msg.Runes))
 	}
 	return nil
@@ -131,77 +385,75 @@ func (p *picker) View() string {
 	b.WriteString(sty.search.Render(p.query))
 	b.WriteString("\n\n")
 
-	v := p.visibleHosts()
-	if len(v) == 0 {
+	if len(p.visibleHosts()) == 0 {
 		b.WriteString(sty.dim.Render("  (no matching hosts)"))
 		return b.String()
 	}
 
-	// Pre-compute count-of-hosts per prefix path so headers can render
-	// "▸ HOME (5)" with the total under that section.
-	prefixCount := map[string]int{}
-	for _, h := range v {
-		segs := config.GroupSegments(h.Group)
-		if len(segs) == 0 {
-			segs = []string{"ungrouped"}
-		}
-		path := ""
-		for _, s := range segs {
-			if path == "" {
-				path = s
-			} else {
-				path = path + "/" + s
-			}
-			prefixCount[path]++
-		}
+	rows := p.visibleRows()
+	if len(rows) == 0 {
+		b.WriteString(sty.dim.Render("  (no matching hosts)"))
+		return b.String()
 	}
 
-	var prev []string
-	firstHeader := true
-	for i, h := range v {
-		segs := config.GroupSegments(h.Group)
-		if len(segs) == 0 {
-			segs = []string{"ungrouped"}
-		}
-		// Emit headers only for path segments beyond the common prefix with
-		// the previous host's path. A blank line separates top-level groups;
-		// nested sub-group transitions stay flush.
-		common := config.CommonPrefixLen(prev, segs)
-		for level := common; level < len(segs); level++ {
-			if level == 0 && !firstHeader {
-				b.WriteString("\n")
-			}
-			firstHeader = false
-			path := strings.Join(segs[:level+1], "/")
-			b.WriteString(renderGroupHeader(segs[level], level, prefixCount[path], p.w))
+	collapsed := p.effectiveCollapsed()
+	start, end, more := listWindow(len(rows), p.cursor, p.maxVisibleRows())
+	if more.above > 0 {
+		b.WriteString(sty.dim.Render(fmt.Sprintf("  ▴ %d more above", more.above)))
+		b.WriteString("\n")
+	}
+	for i := start; i < end; i++ {
+		row := rows[i]
+		if row.kind == pickerRowGroup && row.depth == 0 && i > 0 {
 			b.WriteString("\n")
 		}
-		prev = segs
-
-		indent := strings.Repeat("  ", len(segs))
-		row := formatHostRow(h, p.deco)
 		if i == p.cursor {
-			line := ansi.Truncate(indent+"> "+row, p.w, "")
-			b.WriteString(sty.selectionBar.Width(p.w).Render(line))
+			b.WriteString(renderPickerRow(row, collapsed, p.deco, p.w, true))
 		} else {
-			b.WriteString(sty.dim.Render(indent + "  " + row))
+			b.WriteString(renderPickerRow(row, collapsed, p.deco, p.w, false))
 		}
+		b.WriteString("\n")
+	}
+	if more.below > 0 {
+		b.WriteString(sty.dim.Render(fmt.Sprintf("  ▾ %d more below", more.below)))
 		b.WriteString("\n")
 	}
 	return strings.TrimRight(b.String(), "\n")
 }
 
+func renderPickerRow(row pickerRow, collapsed map[string]bool, deco pickerDecorations, width int, selected bool) string {
+	if row.kind == pickerRowGroup {
+		expanded := !collapsed[row.path]
+		line := renderGroupHeader(row.label, row.depth, row.count, width, expanded)
+		if selected {
+			return sty.selectionBar.Width(width).Render(ansi.Truncate("> "+line, width, ""))
+		}
+		return sty.dim.Render(line)
+	}
+	indent := strings.Repeat("  ", row.depth)
+	text := formatHostRow(row.host, deco)
+	if selected {
+		line := ansi.Truncate(indent+"> "+text, width, "")
+		return sty.selectionBar.Width(width).Render(line)
+	}
+	return sty.dim.Render(indent + "  " + text)
+}
+
 // renderGroupHeader formats a picker group separator like:
 //
-//	▸ DEVELOPMENT (3) ─────────────────────────────
+//	▾ DEVELOPMENT (3) ─────────────────────────────
 //
 // with the glyph + label in the accent group-header style, a parenthesized
 // count of hosts in this section (zero hides the count), and a trailing
 // rule in dim. depth indents nested sub-groups (2 spaces per level) so the
 // hierarchy is visible without changing colors.
-func renderGroupHeader(label string, depth, count, width int) string {
+func renderGroupHeader(label string, depth, count, width int, expanded bool) string {
 	upper := strings.ToUpper(label)
-	prefix := strings.Repeat("  ", depth) + "▸ " + upper
+	glyph := "▾"
+	if !expanded {
+		glyph = "▸"
+	}
+	prefix := strings.Repeat("  ", depth) + glyph + " " + upper
 	if count > 0 {
 		prefix += fmt.Sprintf(" (%d)", count)
 	}

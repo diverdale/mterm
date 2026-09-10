@@ -187,10 +187,13 @@ delete, rename, multi-select, edit, and view-file.
 **Depends on:** nothing. Doubles as the cheap path to remote-multiplexer detach (see below).
 
 ### Connection groups in picker
-**What:** Picker rows grouped by `group:` field in `hosts.yaml`; collapsible group headers.
-**Why:** 50 routers + 30 servers + 10 dev boxes — flat list becomes unusable.
-**Size:** S
-**Open:** Group ordering; default-collapsed vs default-expanded.
+**What:** Picker rows grouped by `group:` field in `hosts.yaml`; collapsible group
+headers + viewport scrolling (cursor-visible window, truncation indicators).
+**Why:** 50 routers + 30 servers + 10 dev boxes — flat list becomes unusable; today
+overflow is silently truncated.
+**Size:** S (collapse + scroll); M if persistence/settings added.
+**Spec:** `docs/superpowers/specs/2026-09-09-picker-collapse-scroll-design.md`
+**Open (v2):** Persisted collapse state; `default_collapsed` in settings.
 **Depends on:** nothing. (Finishes the earlier "how do I group items" question.)
 
 ### Configurable keymap

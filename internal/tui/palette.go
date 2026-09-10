@@ -125,7 +125,11 @@ func (p *paletteModel) View() string {
 	if len(v) == 0 {
 		b.WriteString(sty.dim.Render("  (no matching commands)"))
 	} else {
-		start, end, more := paletteWindow(len(v), p.cursor, p.termH)
+		maxRows := 0
+		if p.termH > 0 {
+			maxRows = p.termH - paletteChromeRows
+		}
+		start, end, more := listWindow(len(v), p.cursor, maxRows)
 		if more.above > 0 {
 			b.WriteString(sty.dim.Render(fmt.Sprintf("  ▴ %d more above", more.above)))
 			b.WriteString("\n")
@@ -185,52 +189,3 @@ func (p *paletteModel) View() string {
 	return box.Render(b.String())
 }
 
-// paletteMore is the pair of "items hidden above / below" counters for
-// the visible window.
-type paletteMore struct {
-	above int
-	below int
-}
-
-// paletteWindow picks the [start, end) slice of the visible command list
-// to display, keeping the cursor on-screen and respecting the terminal's
-// height budget. When termH is 0 or the list fits, returns the full range
-// and zero "more" counters.
-func paletteWindow(total, cursor, termH int) (start, end int, more paletteMore) {
-	if total == 0 {
-		return 0, 0, paletteMore{}
-	}
-	rows := total
-	if termH > 0 {
-		rows = termH - paletteChromeRows
-		if rows < 3 {
-			rows = 3 // always show at least a few items even on tiny terminals
-		}
-	}
-	if rows >= total {
-		return 0, total, paletteMore{}
-	}
-	// Cap window size to actual count.
-	if cursor < 0 {
-		cursor = 0
-	}
-	if cursor >= total {
-		cursor = total - 1
-	}
-	// Try to put the cursor in the middle of the window. Then clamp.
-	start = cursor - rows/2
-	if start < 0 {
-		start = 0
-	}
-	end = start + rows
-	if end > total {
-		end = total
-		start = end - rows
-		if start < 0 {
-			start = 0
-		}
-	}
-	more.above = start
-	more.below = total - end
-	return start, end, more
-}
