@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -47,6 +48,7 @@ func TestPickerSelectionReturnsHost(t *testing.T) {
 	p := newPicker(sampleHosts())
 	p.setSize(80, 24)
 	p.setQuery("lab")
+	p.moveCursor(1) // skip lab group header
 	h, ok := p.selected()
 	if !ok || h.Name != "lab-box" {
 		t.Fatalf("selected() = %v,%v want lab-box,true", h.Name, ok)
@@ -63,30 +65,28 @@ func names(hs []config.Host) []string {
 
 func TestPickerCursorWrapsAround(t *testing.T) {
 	p := newPicker(sampleHosts())
-	// cursor starts at 0 (prod-web)
 	p.moveCursor(-1)
 	h, ok := p.selected()
 	if !ok || h.Name != "lab-box" {
 		t.Fatalf("moveCursor(-1) from 0 = %v,%v; want lab-box,true", h.Name, ok)
 	}
 	p.moveCursor(1)
-	h, ok = p.selected()
-	if !ok || h.Name != "prod-web" {
-		t.Fatalf("moveCursor(1) from last = %v,%v; want prod-web,true", h.Name, ok)
+	if row := p.cursorRow(); row == nil || row.kind != pickerRowGroup {
+		t.Fatalf("moveCursor(1) from last should land on first row (group header)")
 	}
 }
 
 func TestPickerUpdateKeyDispatch(t *testing.T) {
 	p := newPicker(sampleHosts())
 
-	// KeyDown moves cursor to second host
+	// Row 0 = production header, row 1 = prod-web, row 2 = prod-db
+	p.Update(tea.KeyMsg{Type: tea.KeyDown})
 	p.Update(tea.KeyMsg{Type: tea.KeyDown})
 	h, ok := p.selected()
 	if !ok || h.Name != "prod-db" {
-		t.Fatalf("after KeyDown selected = %v,%v; want prod-db,true", h.Name, ok)
+		t.Fatalf("after two KeyDown selected = %v,%v; want prod-db,true", h.Name, ok)
 	}
 
-	// KeyEnter returns a command that emits pickerChosenMsg
 	cmd := p.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("KeyEnter returned nil cmd, want non-nil")
@@ -100,7 +100,6 @@ func TestPickerUpdateKeyDispatch(t *testing.T) {
 		t.Fatalf("pickerChosenMsg.host = %v; want prod-db", chosen.host.Name)
 	}
 
-	// KeyEsc returns a command that emits pickerCancelledMsg
 	cmd = p.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if cmd == nil {
 		t.Fatal("KeyEsc returned nil cmd, want non-nil")
@@ -112,14 +111,12 @@ func TestPickerUpdateKeyDispatch(t *testing.T) {
 }
 
 func TestPickerViewEmptyDoesNotPanic(t *testing.T) {
-	// nil host list
 	p := newPicker(nil)
 	s := p.View()
 	if s == "" {
 		t.Fatal("View() with nil hosts returned empty string")
 	}
 
-	// non-nil hosts but query filters all out
 	p2 := newPicker(sampleHosts())
 	p2.setQuery("zzzznomatch")
 	s2 := p2.View()
@@ -134,12 +131,10 @@ func TestPickerViewEmptyDoesNotPanic(t *testing.T) {
 func TestPickerSelectionBarIsFullWidth(t *testing.T) {
 	p := newPicker(sampleHosts())
 	p.setSize(80, 24)
+	p.moveCursor(1) // prod-web host row
 	out := p.View()
-	// The cursor starts at row 0; find the rendered line for the first host
-	// and confirm it spans the full picker width.
-	h0 := p.visibleHosts()[0]
 	for _, ln := range strings.Split(out, "\n") {
-		if strings.Contains(ln, h0.Name) {
+		if strings.Contains(ln, "prod-web") {
 			if w := lipgloss.Width(ln); w != p.w {
 				t.Fatalf("selection bar width = %d, want %d (full width)", w, p.w)
 			}
@@ -153,22 +148,17 @@ func TestPickerViewHasSelectionAndGroups(t *testing.T) {
 	p := newPicker(sampleHosts())
 	p.setSize(80, 24)
 	out := p.View()
-	// Group headers are uppercased and led by ▸ glyph.
-	for _, want := range []string{"▸ PRODUCTION", "▸ LAB"} {
+	for _, want := range []string{"▾ PRODUCTION", "▾ LAB"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("picker body missing group header %q:\n%s", want, out)
 		}
 	}
-	// The selected host's row carries styling (ANSI escape codes), since
-	// the cursor row is a selection bar.
 	if !strings.Contains(out, "\x1b[") {
 		t.Fatalf("picker body has no styling at all:\n%s", out)
 	}
 }
 
 func TestPickerGroupHeaderHasBlankLineBetweenGroups(t *testing.T) {
-	// Two non-empty groups → there should be a blank line between the last
-	// host of group A and the header of group B (visual separation).
 	p := newPicker(sampleHosts())
 	p.setSize(80, 24)
 	out := p.View()
@@ -176,10 +166,10 @@ func TestPickerGroupHeaderHasBlankLineBetweenGroups(t *testing.T) {
 	lines := strings.Split(out, "\n")
 	prodIdx, labIdx := -1, -1
 	for i, ln := range lines {
-		if strings.Contains(ln, "▸ PRODUCTION") {
+		if strings.Contains(ln, "▾ PRODUCTION") || strings.Contains(ln, "▸ PRODUCTION") {
 			prodIdx = i
 		}
-		if strings.Contains(ln, "▸ LAB") {
+		if strings.Contains(ln, "▾ LAB") || strings.Contains(ln, "▸ LAB") {
 			labIdx = i
 		}
 	}
@@ -189,7 +179,6 @@ func TestPickerGroupHeaderHasBlankLineBetweenGroups(t *testing.T) {
 	if labIdx <= prodIdx+2 {
 		t.Fatalf("expected a blank line between groups; LAB at %d, PRODUCTION at %d", labIdx, prodIdx)
 	}
-	// Verify the line immediately preceding the LAB header is blank.
 	if strings.TrimSpace(lines[labIdx-1]) != "" {
 		t.Fatalf("line before LAB header is not blank: %q", lines[labIdx-1])
 	}
@@ -206,15 +195,12 @@ func TestPickerNestedGroupsRenderHierarchy(t *testing.T) {
 	p.setSize(80, 24)
 	out := p.View()
 
-	// All four expected headers must appear.
-	for _, want := range []string{"▸ HOME", "▸ MEDIA", "▸ DEVELOPMENT", "▸ WORK", "▸ PROJECT1"} {
+	for _, want := range []string{"▾ HOME", "▾ MEDIA", "▾ DEVELOPMENT", "▾ WORK", "▾ PROJECT1"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("output missing header %q in:\n%s", want, out)
 		}
 	}
-
-	// Sub-group headers must be indented (2 spaces per depth level).
-	for _, want := range []string{"  ▸ MEDIA", "  ▸ DEVELOPMENT", "  ▸ PROJECT1"} {
+	for _, want := range []string{"  ▾ MEDIA", "  ▾ DEVELOPMENT", "  ▾ PROJECT1"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("output missing indented header %q in:\n%s", want, out)
 		}
@@ -222,8 +208,6 @@ func TestPickerNestedGroupsRenderHierarchy(t *testing.T) {
 }
 
 func TestPickerSiblingsShareSingleParentHeader(t *testing.T) {
-	// Home/Media and Home/Development should produce ONE "▸ HOME" header,
-	// then both sub-group headers under it.
 	hosts := []config.Host{
 		{Name: "a", Group: "Home/Media"},
 		{Name: "b", Group: "Home/Development"},
@@ -231,25 +215,22 @@ func TestPickerSiblingsShareSingleParentHeader(t *testing.T) {
 	p := newPicker(hosts)
 	p.setSize(80, 24)
 	out := p.View()
-	if got := strings.Count(out, "▸ HOME"); got != 1 {
+	if got := strings.Count(out, "▾ HOME"); got != 1 {
 		t.Fatalf("expected exactly one HOME header, got %d in:\n%s", got, out)
 	}
 }
 
 func TestPickerNestedHostRowIndented(t *testing.T) {
-	// Two hosts at the same depth so we can check the cursor and a
-	// non-cursor row separately.
 	hosts := []config.Host{
 		{Name: "alpha", HostName: "1.1.1.1", Group: "Home/Media"},
 		{Name: "beta", HostName: "2.2.2.2", Group: "Home/Media"},
 	}
 	p := newPicker(hosts)
 	p.setSize(80, 24)
+	p.moveCursor(2) // HOME header, MEDIA header, then alpha host
 	out := p.View()
 	stripped := ansiRE.ReplaceAllString(out, "")
 
-	// Depth 2 → 2*2 = 4 spaces of indent, then "> "/"  " cursor pad, then
-	// the connection glyph (○ for never-connected), then the name.
 	if !strings.Contains(stripped, "    > ○ alpha") {
 		t.Fatalf("cursor row at depth 2 should start with %q; stripped:\n%s", "    > ○ alpha", stripped)
 	}
@@ -298,10 +279,159 @@ func TestPickerGroupHeaderShowsCount(t *testing.T) {
 	p.setSize(80, 24)
 	out := p.View()
 
-	// Home has 3 hosts (2 + 1) across two sub-groups.
-	for _, want := range []string{"▸ HOME (3)", "▸ MEDIA (2)", "▸ DEVELOPMENT (1)"} {
+	for _, want := range []string{"▾ HOME (3)", "▾ MEDIA (2)", "▾ DEVELOPMENT (1)"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected header %q in:\n%s", want, out)
 		}
+	}
+}
+
+func TestPickerCollapseHidesHosts(t *testing.T) {
+	p := newPicker(sampleHosts())
+	p.setSize(80, 24)
+	p.setCollapsed("production", true)
+	out := ansiRE.ReplaceAllString(p.View(), "")
+	if strings.Contains(out, "prod-web") || strings.Contains(out, "prod-db") {
+		t.Fatalf("collapsed production should hide hosts; got:\n%s", out)
+	}
+	if !strings.Contains(out, "▸ PRODUCTION") {
+		t.Fatalf("collapsed production header should remain visible")
+	}
+	if !strings.Contains(out, "lab-box") {
+		t.Fatalf("lab hosts should remain visible")
+	}
+}
+
+func TestPickerNestedCollapseHidesSubtree(t *testing.T) {
+	hosts := []config.Host{
+		{Name: "a", Group: "Home/Media"},
+		{Name: "b", Group: "Home/Development"},
+		{Name: "c", Group: "Work/Project1"},
+	}
+	p := newPicker(hosts)
+	p.setSize(80, 24)
+	p.setCollapsed("Home", true)
+	out := ansiRE.ReplaceAllString(p.View(), "")
+	if strings.Contains(out, "○ a") || strings.Contains(out, "○ b") {
+		t.Fatalf("collapsed Home should hide all descendants; got:\n%s", out)
+	}
+	if !strings.Contains(out, "▸ HOME") {
+		t.Fatalf("Home header should remain")
+	}
+	if !strings.Contains(out, "c") {
+		t.Fatalf("Work group should remain visible")
+	}
+}
+
+func TestPickerCollapsePreservesChildState(t *testing.T) {
+	hosts := []config.Host{
+		{Name: "a", Group: "Home/Media"},
+		{Name: "b", Group: "Home/Development"},
+	}
+	p := newPicker(hosts)
+	p.setCollapsed("Home/Media", true)
+	p.setCollapsed("Home", true)
+	p.setCollapsed("Home", false) // re-expand Home; Media stays collapsed
+	out := ansiRE.ReplaceAllString(p.View(), "")
+	if strings.Contains(out, "○ a") {
+		t.Fatalf("Media should stay collapsed after re-expanding Home; got:\n%s", out)
+	}
+	if !strings.Contains(out, "○ b") {
+		t.Fatalf("Development host should be visible; got:\n%s", out)
+	}
+}
+
+func TestPickerSearchOverridesCollapse(t *testing.T) {
+	p := newPicker(sampleHosts())
+	p.setSize(80, 24)
+	p.setCollapsed("production", true)
+	p.setQuery("prod-db")
+	out := ansiRE.ReplaceAllString(p.View(), "")
+	if !strings.Contains(out, "prod-db") {
+		t.Fatalf("search should show matching host despite collapse; got:\n%s", out)
+	}
+	p.setQuery("")
+	out = ansiRE.ReplaceAllString(p.View(), "")
+	if strings.Contains(out, "prod-db") {
+		t.Fatalf("clearing search should restore collapse; got:\n%s", out)
+	}
+}
+
+func TestPickerEnterOnHeaderToggles(t *testing.T) {
+	p := newPicker(sampleHosts())
+	p.setSize(80, 24)
+	p.Update(tea.KeyMsg{Type: tea.KeyEnter}) // toggle production header
+	out := ansiRE.ReplaceAllString(p.View(), "")
+	if strings.Contains(out, "prod-web") {
+		t.Fatalf("Enter on production header should collapse; got:\n%s", out)
+	}
+	if !strings.Contains(out, "▸ PRODUCTION") {
+		t.Fatalf("header should show collapsed glyph")
+	}
+}
+
+func TestPickerSpaceOnHeaderToggles(t *testing.T) {
+	p := newPicker(sampleHosts())
+	p.setSize(80, 24)
+	p.Update(tea.KeyMsg{Type: tea.KeySpace})
+	out := ansiRE.ReplaceAllString(p.View(), "")
+	if strings.Contains(out, "prod-web") {
+		t.Fatalf("Space on production header should collapse; got:\n%s", out)
+	}
+}
+
+func TestPickerArrowKeysFoldHeader(t *testing.T) {
+	p := newPicker(sampleHosts())
+	p.setSize(80, 24)
+	p.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	out := ansiRE.ReplaceAllString(p.View(), "")
+	if strings.Contains(out, "prod-web") {
+		t.Fatalf("Left on expanded header should collapse; got:\n%s", out)
+	}
+	p.Update(tea.KeyMsg{Type: tea.KeyRight})
+	out = ansiRE.ReplaceAllString(p.View(), "")
+	if !strings.Contains(out, "prod-web") {
+		t.Fatalf("Right on collapsed header should expand; got:\n%s", out)
+	}
+}
+
+func TestPickerViewportShowsTruncationIndicator(t *testing.T) {
+	hosts := make([]config.Host, 0, 20)
+	for i := 0; i < 20; i++ {
+		hosts = append(hosts, config.Host{
+			Name:     fmt.Sprintf("host-%02d", i),
+			HostName: fmt.Sprintf("10.0.0.%d", i),
+			Group:    "big",
+		})
+	}
+	p := newPicker(hosts)
+	p.setSize(80, 12) // short terminal forces viewport
+	p.cursor = 15
+	out := p.View()
+	if !strings.Contains(out, "more above") && !strings.Contains(out, "more below") {
+		t.Fatalf("expected truncation indicator in short terminal view:\n%s", out)
+	}
+}
+
+func TestBuildRowsCollapsedSiblingUnaffected(t *testing.T) {
+	hosts := []config.Host{
+		{Name: "a", Group: "production"},
+		{Name: "b", Group: "lab"},
+	}
+	collapsed := map[string]bool{"production": true}
+	rows := buildRows(hosts, collapsed)
+	for _, r := range rows {
+		if r.kind == pickerRowHost && r.host.Name == "a" {
+			t.Fatal("production host should be hidden")
+		}
+	}
+	foundLab := false
+	for _, r := range rows {
+		if r.kind == pickerRowHost && r.host.Name == "b" {
+			foundLab = true
+		}
+	}
+	if !foundLab {
+		t.Fatal("lab host should remain visible")
 	}
 }

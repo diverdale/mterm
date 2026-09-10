@@ -33,12 +33,14 @@ Tabs that don't need a prefix are noted explicitly.
 
 ## Picker
 
-| Key      | Action                |
-|----------|-----------------------|
-| (type)   | fuzzy-filter hosts    |
-| ↑ / ↓    | move cursor           |
-| Enter    | connect               |
-| Esc      | back to active session|
+| Key           | Action                                      |
+|---------------|---------------------------------------------|
+| (type)        | fuzzy-filter hosts                          |
+| ↑ / ↓         | move cursor (headers and hosts are rows)    |
+| Enter         | connect (host row) / toggle group (header)|
+| Space         | toggle group expand/collapse (header row)   |
+| ← / →         | collapse / expand group (header row)        |
+| Esc           | back to active session                      |
 
 ## Command palette
 

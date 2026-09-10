@@ -740,10 +740,16 @@ func (a *App) pickerDecorations() pickerDecorations {
 }
 
 func (a *App) pickerView() string {
-	a.picker.setSize(a.width-chromeCols, a.height-4)
+	a.picker.setSize(a.width-chromeCols, a.height)
 	a.picker.setDecorations(a.pickerDecorations())
 	footer := renderFooter(footerOpts{
-		hints: []keyHint{{"enter", "connect"}, {"type", "filter"}, {"esc", "back"}},
+		hints: []keyHint{
+			{"enter", "connect"},
+			{"space", "toggle"},
+			{"←/→", "fold"},
+			{"type", "filter"},
+			{"esc", "back"},
+		},
 		info:  fmt.Sprintf("%d hosts", len(a.picker.all)),
 		width: a.width - 2,
 	}, sty)

@@ -69,24 +69,20 @@ func TestPaletteEnterWithNoVisibleNoOps(t *testing.T) {
 	}
 }
 
-func TestPaletteWindowWhenListFits(t *testing.T) {
-	// With a huge termH the window is the full list.
-	start, end, more := paletteWindow(5, 2, 100)
+func TestListWindowWhenListFits(t *testing.T) {
+	start, end, more := listWindow(5, 2, 100)
 	if start != 0 || end != 5 || more.above != 0 || more.below != 0 {
 		t.Fatalf("fits: got start=%d end=%d more=%+v", start, end, more)
 	}
-	// termH=0 means "unconstrained" — same result.
-	s2, e2, m2 := paletteWindow(5, 2, 0)
+	s2, e2, m2 := listWindow(5, 2, 0)
 	if s2 != 0 || e2 != 5 || m2.above != 0 || m2.below != 0 {
-		t.Fatalf("termH=0 should mean unconstrained; got start=%d end=%d more=%+v", s2, e2, m2)
+		t.Fatalf("maxRows=0 should mean unconstrained; got start=%d end=%d more=%+v", s2, e2, m2)
 	}
 }
 
-func TestPaletteWindowScrollsToKeepCursorVisible(t *testing.T) {
-	// 50 items, terminal that fits ~3 rows after chrome. Cursor at index
-	// 40 must be inside the returned [start, end) slice.
+func TestListWindowScrollsToKeepCursorVisible(t *testing.T) {
 	const total = 50
-	start, end, more := paletteWindow(total, 40, paletteChromeRows+3)
+	start, end, more := listWindow(total, 40, 3)
 	if 40 < start || 40 >= end {
 		t.Fatalf("cursor 40 not in window [%d, %d)", start, end)
 	}
@@ -96,23 +92,20 @@ func TestPaletteWindowScrollsToKeepCursorVisible(t *testing.T) {
 	}
 }
 
-func TestPaletteWindowClampsAtTopAndBottom(t *testing.T) {
+func TestListWindowClampsAtTopAndBottom(t *testing.T) {
 	const total = 50
-	start, _, more := paletteWindow(total, 0, paletteChromeRows+5)
+	start, _, more := listWindow(total, 0, 5)
 	if start != 0 || more.above != 0 {
 		t.Fatalf("cursor at top: got start=%d above=%d", start, more.above)
 	}
-	_, end, more := paletteWindow(total, total-1, paletteChromeRows+5)
+	_, end, more := listWindow(total, total-1, 5)
 	if end != total || more.below != 0 {
 		t.Fatalf("cursor at bottom: got end=%d below=%d", end, more.below)
 	}
 }
 
-func TestPaletteWindowMinimumRowsOnTinyTerminal(t *testing.T) {
-	// Even on an absurdly short terminal we should still see at least a
-	// few items — never zero (otherwise the user can't see what's
-	// selected).
-	start, end, _ := paletteWindow(50, 25, 1)
+func TestListWindowMinimumRowsOnTinyTerminal(t *testing.T) {
+	start, end, _ := listWindow(50, 25, 1)
 	if end-start < 3 {
 		t.Fatalf("expected at least 3 rows on tiny terminal; got %d", end-start)
 	}
