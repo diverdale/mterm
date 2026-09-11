@@ -195,6 +195,13 @@ func run() error {
 			fmt.Fprintln(os.Stderr, appmeta.Name+": warning: workspaces load:", err)
 		}
 	}
+	if snipPath, err := config.SnippetsFile(); err == nil {
+		if snips, err := config.LoadSnippets(snipPath); err == nil {
+			app.SetSnippets(snips)
+		} else {
+			fmt.Fprintln(os.Stderr, appmeta.Name+": warning: snippets load:", err)
+		}
+	}
 	p := tea.NewProgram(app, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = p.Run()
 	return err

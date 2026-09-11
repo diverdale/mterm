@@ -132,11 +132,15 @@ delete, rename, multi-select, edit, and view-file.
 **Open:** Override whole theme vs only border.
 **Depends on:** existing Theme abstraction (already shipped).
 
-### Snippets / send-command palette
-**What:** Saved commands in `~/.config/mterm/snippets.yaml`; `^B e` (placeholder — `^B m` is now the frame toggle, final letter TBD) opens a palette; enter sends to active session. Per-host and global namespaces.
+### Snippets / send-command palette ✓ shipped (v1)
+**What:** Saved commands in `~/.config/mterm/snippets.yaml`; `^B e` opens a
+palette; enter sends to the active session. Global + per-host (`host_snippets`)
+namespaces; auto-appends Enter for single-line snippets.
 **Why:** Stop re-typing `kubectl get pods -A -o wide` and `show ip int brief`.
-**Size:** M
-**Open:** Variable interpolation (`{{host}}`, prompted vars); multi-line sequencing with wait-for-prompt.
+**Size:** M (v1 minimal); S for what shipped
+**Open (v2):** Variable interpolation (`{{host}}`, prompted vars); multi-line
+sequencing with wait-for-prompt; reload config picks up snippet edits; broadcast
+sync fan-out.
 **Depends on:** command palette (already shipped) — same UI pattern.
 
 ### Live host monitor panel

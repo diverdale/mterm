@@ -73,6 +73,33 @@ func TestChromeStylesForPreservesBoldOnOverride(t *testing.T) {
 	}
 }
 
+func TestContrastingForegroundPicksReadablePair(t *testing.T) {
+	cases := []struct {
+		bg   lipgloss.Color
+		want lipgloss.Color
+	}{
+		{Midnight.Accent, selectionFgDark},
+		{Matrix.Accent, selectionFgDark},
+		{Synthwave.Accent, selectionFgLight},
+		{lipgloss.Color("#0B0F14"), selectionFgLight},
+		{lipgloss.Color("#E8ECF0"), selectionFgDark},
+	}
+	for _, tc := range cases {
+		if got := contrastingForeground(tc.bg); got != tc.want {
+			t.Errorf("contrastingForeground(%v) = %v, want %v", tc.bg, got, tc.want)
+		}
+	}
+}
+
+func TestSelectionBarForegroundDiffersFromAccent(t *testing.T) {
+	for _, th := range Themes() {
+		s := buildStyles(th)
+		if s.selectionBar.GetForeground() == s.selectionBar.GetBackground() {
+			t.Errorf("theme %q: selection bar fg == bg (%v)", th.Name, s.selectionBar.GetBackground())
+		}
+	}
+}
+
 func TestChromeStylesForPreservesUntintedStyles(t *testing.T) {
 	s := chromeStylesFor("#FF3344")
 	// These stay theme colors and must not be overridden.
