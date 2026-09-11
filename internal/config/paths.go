@@ -86,6 +86,16 @@ func SettingsFile() (string, error) {
 	return filepath.Join(dir, "settings.yaml"), nil
 }
 
+// SnippetsFile returns the path to snippets.yaml (saved commands for the
+// ^B e send palette).
+func SnippetsFile() (string, error) {
+	dir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "snippets.yaml"), nil
+}
+
 // BootstrapConfigDir creates ConfigDir() if it does not yet exist. Idempotent.
 // Called at startup so a fresh install can drop hosts.yaml in place without
 // the user having to mkdir first.

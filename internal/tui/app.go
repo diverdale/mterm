@@ -30,6 +30,7 @@ const (
 	modeWorkspaceSave
 	modeFileBrowser
 	modeCopyMode
+	modeSnippets
 )
 
 // renderInterval is the coalesced redraw cadence (~30 fps).
@@ -63,6 +64,7 @@ type App struct {
 	workspaceSave *workspaceSaveModel
 	fileBrowser   *fileBrowserModel
 	copyMode      *copyModeModel
+	snippets      *snippetsModel
 	prevMode      viewMode
 	tabs          []*sessionTab
 	active        int
@@ -86,6 +88,9 @@ type App struct {
 	// workspaces persists named tab sets. Optional — nil hides the
 	// workspace commands from the palette.
 	workspaces *workspaces.Store
+
+	// snippetDefs holds saved commands from snippets.yaml.
+	snippetDefs config.Snippets
 }
 
 // NewApp builds the root model.
@@ -130,6 +135,10 @@ func (a *App) SetHistory(h *history.Store) { a.history = h }
 // SetWorkspaces attaches a workspace store. nil hides the workspace
 // commands from the palette. Call before Run.
 func (a *App) SetWorkspaces(w *workspaces.Store) { a.workspaces = w }
+
+// SetSnippets attaches saved command definitions from snippets.yaml.
+// Call before Run.
+func (a *App) SetSnippets(s config.Snippets) { a.snippetDefs = s }
 
 // Init starts the render ticker.
 func (a *App) Init() tea.Cmd {
@@ -197,6 +206,17 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 		return nil
 
 	case helpClosedMsg:
+		a.mode = a.prevMode
+		return nil
+
+	case snippetChosenMsg:
+		a.mode = a.prevMode
+		if t := a.activeTab(); t != nil {
+			t.sendInput(snippetPayload(m.send))
+		}
+		return nil
+
+	case snippetClosedMsg:
 		a.mode = a.prevMode
 		return nil
 
@@ -304,6 +324,8 @@ func (a *App) handleKey(k tea.KeyMsg) tea.Cmd {
 		return a.fileBrowser.Update(k)
 	case modeCopyMode:
 		return a.copyMode.Update(k)
+	case modeSnippets:
+		return a.snippets.Update(k)
 	}
 
 	// Direct tab-switch shortcuts. Active only in session mode with >1
@@ -413,6 +435,14 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 		// Quick toggle to minimal frame for clipboard-friendly grabs.
 		// Second press restores the prior style. Status hint confirms.
 		a.statusMsg = "frame: " + ToggleMinimalFrame()
+	case "e":
+		if t := a.activeTab(); t != nil {
+			a.prevMode = a.mode
+			a.snippets = newSnippetsModel(a.snippetDefs.ForHost(t.host.Name))
+			a.mode = modeSnippets
+		} else {
+			a.statusMsg = "open a session first"
+		}
 	case "D":
 		// Diagnostic: dump every goroutine's stack to /tmp and surface the
 		// path in the footer. Useful when the snapshot worker for one tab
@@ -631,6 +661,11 @@ func (a *App) View() string {
 		return a.fileBrowserView()
 	case modeCopyMode:
 		return a.copyModeView()
+	case modeSnippets:
+		a.snippets.setSize(a.width, a.height)
+		return lipgloss.Place(a.width, a.height,
+			lipgloss.Center, lipgloss.Center,
+			a.snippets.View())
 	default:
 		return a.pickerView()
 	}
@@ -758,7 +793,7 @@ func (a *App) pickerView() string {
 		body += "\n" + sty.errorText.Render("  "+a.statusMsg)
 	}
 	return renderWindow(windowOpts{
-		title:  sty.title.Render(appmeta.Name),
+		title:  sty.title.Render("Connect"),
 		body:   body,
 		footer: footer,
 		width:  a.width,

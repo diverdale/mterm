@@ -524,6 +524,26 @@ active style. Handy for clipboard grabs (see [Copy mode](#copy-mode-b-)).
 `settings.yaml` is also where future global toggles (a confirm-quit
 switch, a default theme name, etc.) will land — single file, room to grow.
 
+### Snippets (snippets.yaml)
+
+Saved commands sent to the active session via `^B e`. Global snippets
+apply everywhere; `host_snippets` adds host-specific entries keyed by
+the host's `name` from `hosts.yaml` / ssh_config:
+
+```yaml
+snippets:
+  - name: disk free
+    send: df -h
+
+host_snippets:
+  prod-router:
+    - name: show version
+      send: show version
+```
+
+Single-line snippets get Enter appended automatically; multi-line `send`
+blocks are sent as written.
+
 ## Configuration directory
 
 mterm lives under `~/.config/mterm/`:
@@ -537,6 +557,7 @@ mterm lives under `~/.config/mterm/`:
 | `~/.config/mterm/colors.yaml`                     | User-defined `bordercolor` names — yaml map of name → hex, e.g. `myprodred: "#CC0000"`. Merged on top of mterm's built-in palette. |
 | `~/.config/mterm/themes.yaml`                     | User-defined themes (yaml map of theme-name → field map). Unset fields inherit Midnight. Appears in `^B :` → `Theme: <name>`. |
 | `~/.config/mterm/settings.yaml`                   | Global toggles. Today: `frame: rounded\|square\|thick\|double\|ascii\|minimal`. |
+| `~/.config/mterm/snippets.yaml`                   | Saved commands for `^B e` — global snippets plus per-host overrides keyed by host name. |
 
 The directory is created automatically on first run. Logs are raw bytes
 including ANSI escapes — replay faithfully with `less -R <file>`, or

@@ -18,6 +18,7 @@ Tabs that don't need a prefix are noted explicitly.
 | `^B [`    | enter keyboard copy mode (select scrollback → system clipboard) |
 | `^B u`    | open the two-pane SFTP file browser for the active tab |
 | `^B :`    | open the command palette                            |
+| `^B e`    | open the snippets palette (send a saved command)    |
 | `^B ?`    | open the keybinding help overlay                    |
 | `^B D`    | dump every goroutine's stack to `/tmp/mterm-stacks-…` for diagnosis (status line shows the file path) |
 | `^B q`    | quit mterm                                          |
@@ -50,6 +51,15 @@ Tabs that don't need a prefix are noted explicitly.
 | ↑ / ↓    | move cursor           |
 | Enter    | run                   |
 | Esc      | cancel                |
+
+## Snippets (`^B e`)
+
+| Key      | Action                         |
+|----------|--------------------------------|
+| (type)   | filter snippets                |
+| ↑ / ↓    | move cursor                    |
+| Enter    | send to active session         |
+| Esc      | cancel                         |
 
 ## File browser (`^B u`)
 

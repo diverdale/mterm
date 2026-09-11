@@ -42,6 +42,7 @@ var helpSections = []struct {
 		{"^B [", "enter copy mode (keyboard select scrollback → clipboard)"},
 		{"^B u", "open file browser (sftp upload/download)"},
 		{"^B :", "open command palette"},
+		{"^B e", "open snippets palette (send saved command)"},
 		{"^B ?", "this help"},
 		{"^B D", "dump goroutines (diagnostic) → /tmp"},
 		{"^B q", "quit mterm"},
@@ -64,6 +65,12 @@ var helpSections = []struct {
 		{"type", "filter commands"},
 		{"↑ / ↓", "move cursor"},
 		{"enter", "run"},
+		{"esc", "cancel"},
+	}},
+	{"Snippets", []kb{
+		{"type", "filter snippets"},
+		{"↑ / ↓", "move cursor"},
+		{"enter", "send to active session"},
 		{"esc", "cancel"},
 	}},
 	{"Global", []kb{

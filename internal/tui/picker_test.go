@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"mterm/internal/config"
 )
 
@@ -128,6 +129,20 @@ func TestPickerViewEmptyDoesNotPanic(t *testing.T) {
 	}
 }
 
+func TestPickerSelectedGroupHeaderHasNoEmbeddedAccentANSI(t *testing.T) {
+	t.Cleanup(func() { setTheme(Midnight) })
+	setTheme(Matrix)
+
+	row := pickerRow{kind: pickerRowGroup, label: "production", path: "production", depth: 0, count: 2}
+	width := 40
+	line := groupHeaderLine(row.label, row.depth, row.count, true, "> ")
+	want := sty.selectionBar.Width(width).Render(ansi.Truncate(line, width, ""))
+	got := renderPickerRow(row, map[string]bool{}, pickerDecorations{}, width, true)
+	if got != want {
+		t.Fatalf("selected group header should match plain selection bar render\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
 func TestPickerSelectionBarIsFullWidth(t *testing.T) {
 	p := newPicker(sampleHosts())
 	p.setSize(80, 24)
@@ -148,7 +163,7 @@ func TestPickerViewHasSelectionAndGroups(t *testing.T) {
 	p := newPicker(sampleHosts())
 	p.setSize(80, 24)
 	out := p.View()
-	for _, want := range []string{"▾ PRODUCTION", "▾ LAB"} {
+	for _, want := range []string{"▾ production", "▾ lab"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("picker body missing group header %q:\n%s", want, out)
 		}
@@ -158,29 +173,40 @@ func TestPickerViewHasSelectionAndGroups(t *testing.T) {
 	}
 }
 
-func TestPickerGroupHeaderHasBlankLineBetweenGroups(t *testing.T) {
+func TestPickerSelectedGroupHeaderMarkerFollowsIndent(t *testing.T) {
+	// Mirrors Work/MSFT/Infra from a typical nested hosts.yaml.
+	row := pickerRow{kind: pickerRowGroup, label: "Infra", path: "Work/MSFT/Infra", depth: 2, count: 3}
+	stripped := ansiRE.ReplaceAllString(renderPickerRow(row, map[string]bool{}, pickerDecorations{}, 80, true), "")
+	if !strings.HasPrefix(stripped, "    > ▾ Infra") {
+		t.Fatalf("selected group header marker should follow depth indent; got %q", stripped)
+	}
+	unsel := ansiRE.ReplaceAllString(renderPickerRow(row, map[string]bool{}, pickerDecorations{}, 80, false), "")
+	if !strings.HasPrefix(unsel, "      ▾ Infra") {
+		t.Fatalf("unselected group header should reserve a marker column; got %q", unsel)
+	}
+}
+
+func TestPickerGroupHeaderPreservesYamlCase(t *testing.T) {
+	hosts := []config.Host{
+		{Name: "a", Group: "PRODUCTION/Web"},
+		{Name: "b", Group: "PRODUCTION/DB"},
+	}
+	p := newPicker(hosts)
+	p.setSize(80, 24)
+	out := ansiRE.ReplaceAllString(p.View(), "")
+	for _, want := range []string{"▾ PRODUCTION", "    ▾ Web", "    ▾ DB"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected header %q in:\n%s", want, out)
+		}
+	}
+}
+
+func TestPickerShowsColumnHeader(t *testing.T) {
 	p := newPicker(sampleHosts())
 	p.setSize(80, 24)
-	out := p.View()
-
-	lines := strings.Split(out, "\n")
-	prodIdx, labIdx := -1, -1
-	for i, ln := range lines {
-		if strings.Contains(ln, "▾ PRODUCTION") || strings.Contains(ln, "▸ PRODUCTION") {
-			prodIdx = i
-		}
-		if strings.Contains(ln, "▾ LAB") || strings.Contains(ln, "▸ LAB") {
-			labIdx = i
-		}
-	}
-	if prodIdx < 0 || labIdx < 0 {
-		t.Fatalf("missing one of the two group headers; lines:\n%s", out)
-	}
-	if labIdx <= prodIdx+2 {
-		t.Fatalf("expected a blank line between groups; LAB at %d, PRODUCTION at %d", labIdx, prodIdx)
-	}
-	if strings.TrimSpace(lines[labIdx-1]) != "" {
-		t.Fatalf("line before LAB header is not blank: %q", lines[labIdx-1])
+	stripped := ansiRE.ReplaceAllString(p.View(), "")
+	if !strings.Contains(stripped, "NAME") || !strings.Contains(stripped, "ADDRESS") || !strings.Contains(stripped, "LAST") {
+		t.Fatalf("picker should show column headers; got:\n%s", stripped)
 	}
 }
 
@@ -195,12 +221,12 @@ func TestPickerNestedGroupsRenderHierarchy(t *testing.T) {
 	p.setSize(80, 24)
 	out := p.View()
 
-	for _, want := range []string{"▾ HOME", "▾ MEDIA", "▾ DEVELOPMENT", "▾ WORK", "▾ PROJECT1"} {
+	for _, want := range []string{"▾ Home", "▾ Media", "▾ Development", "▾ Work", "▾ Project1"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("output missing header %q in:\n%s", want, out)
 		}
 	}
-	for _, want := range []string{"  ▾ MEDIA", "  ▾ DEVELOPMENT", "  ▾ PROJECT1"} {
+	for _, want := range []string{"    ▾ Media", "    ▾ Development", "    ▾ Project1"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("output missing indented header %q in:\n%s", want, out)
 		}
@@ -215,8 +241,8 @@ func TestPickerSiblingsShareSingleParentHeader(t *testing.T) {
 	p := newPicker(hosts)
 	p.setSize(80, 24)
 	out := p.View()
-	if got := strings.Count(out, "▾ HOME"); got != 1 {
-		t.Fatalf("expected exactly one HOME header, got %d in:\n%s", got, out)
+	if got := strings.Count(out, "▾ Home"); got != 1 {
+		t.Fatalf("expected exactly one Home header, got %d in:\n%s", got, out)
 	}
 }
 
@@ -277,9 +303,9 @@ func TestPickerGroupHeaderShowsCount(t *testing.T) {
 	}
 	p := newPicker(hosts)
 	p.setSize(80, 24)
-	out := p.View()
+	out := ansiRE.ReplaceAllString(p.View(), "")
 
-	for _, want := range []string{"▾ HOME (3)", "▾ MEDIA (2)", "▾ DEVELOPMENT (1)"} {
+	for _, want := range []string{"▾ Home · 3", "▾ Media · 2", "▾ Development · 1"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected header %q in:\n%s", want, out)
 		}
@@ -294,7 +320,7 @@ func TestPickerCollapseHidesHosts(t *testing.T) {
 	if strings.Contains(out, "prod-web") || strings.Contains(out, "prod-db") {
 		t.Fatalf("collapsed production should hide hosts; got:\n%s", out)
 	}
-	if !strings.Contains(out, "▸ PRODUCTION") {
+	if !strings.Contains(out, "▸ production") {
 		t.Fatalf("collapsed production header should remain visible")
 	}
 	if !strings.Contains(out, "lab-box") {
@@ -315,7 +341,7 @@ func TestPickerNestedCollapseHidesSubtree(t *testing.T) {
 	if strings.Contains(out, "○ a") || strings.Contains(out, "○ b") {
 		t.Fatalf("collapsed Home should hide all descendants; got:\n%s", out)
 	}
-	if !strings.Contains(out, "▸ HOME") {
+	if !strings.Contains(out, "▸ Home") {
 		t.Fatalf("Home header should remain")
 	}
 	if !strings.Contains(out, "c") {
@@ -365,7 +391,7 @@ func TestPickerEnterOnHeaderToggles(t *testing.T) {
 	if strings.Contains(out, "prod-web") {
 		t.Fatalf("Enter on production header should collapse; got:\n%s", out)
 	}
-	if !strings.Contains(out, "▸ PRODUCTION") {
+	if !strings.Contains(out, "▸ production") {
 		t.Fatalf("header should show collapsed glyph")
 	}
 }

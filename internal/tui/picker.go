@@ -315,9 +315,17 @@ func (p *picker) moveCursor(delta int) {
 	p.cursor = (p.cursor + delta + len(rows)) % len(rows)
 }
 
-// pickerBodyChrome is non-row vertical space inside the framed body: search
-// line, blank line, and two optional truncation-indicator slots.
-const pickerBodyChrome = 4
+const (
+	pickerMarkerW = 2 // "> " or "  "
+	pickerGlyphW  = 2 // status glyph + space
+	pickerLastW   = 9 // "2h ago" / "—"
+	pickerMinNameW = 8
+	pickerMinHostW = 10
+)
+
+// pickerBodyChrome is non-row vertical space inside the framed body above the
+// scrolling host list: search line, blank line, and column header.
+const pickerBodyChrome = 3
 
 // maxVisibleRows is how many picker rows fit in the window body.
 func (p *picker) maxVisibleRows() int {
@@ -380,8 +388,13 @@ func (p *picker) Update(msg tea.KeyMsg) tea.Cmd {
 // View renders the picker body: a search line and the grouped, filtered host
 // list. The window frame and footer are added by the app.
 func (p *picker) View() string {
+	width := p.w
+	if width <= 0 {
+		width = 80
+	}
+
 	var b strings.Builder
-	b.WriteString(sty.dim.Render("Search: "))
+	b.WriteString(sty.dim.Render("> "))
 	b.WriteString(sty.search.Render(p.query))
 	b.WriteString("\n\n")
 
@@ -396,6 +409,9 @@ func (p *picker) View() string {
 		return b.String()
 	}
 
+	b.WriteString(renderPickerColumnHeader(width))
+	b.WriteString("\n")
+
 	collapsed := p.effectiveCollapsed()
 	start, end, more := listWindow(len(rows), p.cursor, p.maxVisibleRows())
 	if more.above > 0 {
@@ -404,13 +420,10 @@ func (p *picker) View() string {
 	}
 	for i := start; i < end; i++ {
 		row := rows[i]
-		if row.kind == pickerRowGroup && row.depth == 0 && i > 0 {
-			b.WriteString("\n")
-		}
 		if i == p.cursor {
-			b.WriteString(renderPickerRow(row, collapsed, p.deco, p.w, true))
+			b.WriteString(renderPickerRow(row, collapsed, p.deco, width, true))
 		} else {
-			b.WriteString(renderPickerRow(row, collapsed, p.deco, p.w, false))
+			b.WriteString(renderPickerRow(row, collapsed, p.deco, width, false))
 		}
 		b.WriteString("\n")
 	}
@@ -424,50 +437,100 @@ func (p *picker) View() string {
 func renderPickerRow(row pickerRow, collapsed map[string]bool, deco pickerDecorations, width int, selected bool) string {
 	if row.kind == pickerRowGroup {
 		expanded := !collapsed[row.path]
-		line := renderGroupHeader(row.label, row.depth, row.count, width, expanded)
 		if selected {
-			return sty.selectionBar.Width(width).Render(ansi.Truncate("> "+line, width, ""))
+			// Plain text only — renderGroupHeader embeds accent-colored ANSI
+			// that would clash with the selection bar's accent background.
+			// Place the cursor marker after depth indent, matching host rows.
+			line := groupHeaderLine(row.label, row.depth, row.count, expanded, "> ")
+			return sty.selectionBar.Width(width).Render(ansi.Truncate(line, width, ""))
 		}
-		return sty.dim.Render(line)
+		return sty.dim.Render(renderGroupHeader(row.label, row.depth, row.count, expanded))
 	}
 	indent := strings.Repeat("  ", row.depth)
-	text := formatHostRow(row.host, deco)
+	nameW, hostW := pickerHostCols(width, row.depth)
+	text := formatHostRow(row.host, deco, nameW, hostW)
+	marker := "  "
 	if selected {
-		line := ansi.Truncate(indent+"> "+text, width, "")
+		marker = "> "
+	}
+	line := indent + marker + text
+	if selected {
+		line = ansi.Truncate(line, width, "")
 		return sty.selectionBar.Width(width).Render(line)
 	}
-	return sty.dim.Render(indent + "  " + text)
+	return sty.dim.Render(line)
 }
 
 // renderGroupHeader formats a picker group separator like:
 //
-//	▾ DEVELOPMENT (3) ─────────────────────────────
+//	▾ Development · 3
 //
-// with the glyph + label in the accent group-header style, a parenthesized
-// count of hosts in this section (zero hides the count), and a trailing
-// rule in dim. depth indents nested sub-groups (2 spaces per level) so the
-// hierarchy is visible without changing colors.
-func renderGroupHeader(label string, depth, count, width int, expanded bool) string {
-	upper := strings.ToUpper(label)
+// with the glyph + label in the accent group-header style and an optional
+// host count in dim. depth indents nested sub-groups (2 spaces per level).
+func renderGroupHeader(label string, depth, count int, expanded bool) string {
+	text := groupHeaderLine(label, depth, count, expanded, "  ")
+	if count <= 0 {
+		return sty.groupHeader.Render(text)
+	}
+	idx := strings.LastIndex(text, " · ")
+	if idx < 0 {
+		return sty.groupHeader.Render(text)
+	}
+	return sty.groupHeader.Render(text[:idx]) + sty.dim.Render(text[idx:])
+}
+
+// groupHeaderCore is the group label, glyph, and optional count — no indent
+// or cursor marker.
+func groupHeaderCore(label string, count int, expanded bool) string {
 	glyph := "▾"
 	if !expanded {
 		glyph = "▸"
 	}
-	prefix := strings.Repeat("  ", depth) + glyph + " " + upper
+	line := glyph + " " + label
 	if count > 0 {
-		prefix += fmt.Sprintf(" (%d)", count)
+		line += fmt.Sprintf(" · %d", count)
 	}
-	prefix += " "
-	fillW := width - lipgloss.Width(prefix)
-	if fillW < 1 {
-		fillW = 1
+	return line
+}
+
+// groupHeaderLine builds an unstyled group header with depth indent and a
+// cursor-marker column ("  " or "> "), matching host row layout.
+func groupHeaderLine(label string, depth, count int, expanded bool, marker string) string {
+	return strings.Repeat("  ", depth) + marker + groupHeaderCore(label, count, expanded)
+}
+
+// pickerHostCols splits the remaining width between name and address columns.
+func pickerHostCols(width, depth int) (nameW, hostW int) {
+	used := depth*2 + pickerMarkerW + pickerGlyphW + pickerLastW + 2
+	avail := width - used
+	if avail < pickerMinNameW+pickerMinHostW {
+		return pickerMinNameW, pickerMinHostW
 	}
-	return sty.groupHeader.Render(prefix) + sty.dim.Render(strings.Repeat("─", fillW))
+	nameW = avail * 2 / 5
+	if nameW < pickerMinNameW {
+		nameW = pickerMinNameW
+	}
+	hostW = avail - nameW
+	if hostW < pickerMinHostW {
+		hostW = pickerMinHostW
+		nameW = avail - hostW
+		if nameW < pickerMinNameW {
+			nameW = pickerMinNameW
+		}
+	}
+	return nameW, hostW
+}
+
+func renderPickerColumnHeader(width int) string {
+	nameW, hostW := pickerHostCols(width, 0)
+	pad := strings.Repeat(" ", pickerMarkerW+pickerGlyphW)
+	line := fmt.Sprintf("%s%-*s %-*s %s", pad, nameW, "NAME", hostW, "ADDRESS", "LAST")
+	return sty.dim.Render(line)
 }
 
 // formatHostRow renders one host's row as PLAIN text:
 //
-//	<glyph> <name>           <hostname>          <last-connected>   [tags]
+//	<glyph> <name>  <hostname>  <last>  [tags]
 //
 // glyph is "◉" (currently in an open tab), "●" (previously connected at
 // least once), or "○" (never connected). last-connected is a compact
@@ -476,18 +539,32 @@ func renderGroupHeader(label string, depth, count, width int, expanded bool) str
 // The caller wraps the whole row in a single style (the selection bar or
 // the dim style); embedding styling here would break that wrapping style's
 // background, so this returns no ANSI of its own.
-func formatHostRow(h config.Host, deco pickerDecorations) string {
+func formatHostRow(h config.Host, deco pickerDecorations, nameW, hostW int) string {
 	glyph := connectionGlyph(h.Name, deco)
-	last, _ := deco.LastConnected[h.Name]
+	last, ok := deco.LastConnected[h.Name]
 	now := deco.Now
 	if now.IsZero() {
 		now = time.Now()
 	}
-	row := fmt.Sprintf("%s %-16s %-18s  %-9s", glyph, h.Name, h.HostName, history.FormatRelative(now, last))
+	lastStr := "—"
+	if ok {
+		lastStr = history.FormatRelative(now, last)
+	}
+	name := padPlain(ansi.Truncate(h.Name, nameW, ""), nameW)
+	host := padPlain(ansi.Truncate(h.HostName, hostW, ""), hostW)
+	lastCol := padPlain(ansi.Truncate(lastStr, pickerLastW, ""), pickerLastW)
+	row := fmt.Sprintf("%s %s %s %s", glyph, name, host, lastCol)
 	if len(h.Tags) > 0 {
 		row += "  [" + strings.Join(h.Tags, ",") + "]"
 	}
 	return row
+}
+
+func padPlain(s string, width int) string {
+	if w := lipgloss.Width(s); w < width {
+		return s + strings.Repeat(" ", width-w)
+	}
+	return s
 }
 
 // connectionGlyph returns a single-character indicator for whether the user

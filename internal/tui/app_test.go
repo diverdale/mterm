@@ -11,7 +11,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"mterm/internal/appmeta"
 	"mterm/internal/config"
 	mssh "mterm/internal/ssh"
 	"mterm/internal/workspaces"
@@ -445,8 +444,8 @@ func TestAppViewIsFramed(t *testing.T) {
 	if !strings.Contains(lines[0], frame.TopLeft) {
 		t.Fatalf("picker view is not framed; line 0 = %q", lines[0])
 	}
-	if !strings.Contains(out, appmeta.Name) {
-		t.Fatalf("picker frame title should contain %q", appmeta.Name)
+	if !strings.Contains(out, "Connect") {
+		t.Fatalf("picker frame title should contain %q", "Connect")
 	}
 }
 
