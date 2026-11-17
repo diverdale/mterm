@@ -45,6 +45,18 @@ XL ≈ structural change to the app, multiple branches.
   is group/world-readable) and `password_command:` (vault / 1Password /
   `pass` integration). Registers password + keyboard-interactive both
   so Arista/Juniper/Cisco gear all auth cleanly
+- Activity / silence tab badges — unfocused tabs shift their status glyph
+  amber on new output, accent once output has gone quiet for 30s
+- Per-host `on_connect:` commands in hosts.yaml, sent (each followed by
+  Enter) right after the shell comes up
+- Workspaces (hostlist-only) — palette "Save current tabs as workspace…",
+  plus Restore / Delete entries per saved workspace; honors per-host tab counts
+- Connection groups in picker — collapsible `group:` headers + viewport
+  scrolling
+- Mode-aware mouse wheel — when the remote enables mouse tracking
+  (`?1000`/`?1002`/`?1003`, SGR `?1006` or legacy X10 encoding) wheel
+  events go to the remote app (vim `mouse=a`, htop, opencode, lazygit);
+  otherwise the wheel scrolls mterm's local scrollback as before
 
 ---
 
@@ -63,14 +75,14 @@ Follow-ons left on the table:
   Scrollback search Tier 1 item below
 - Remember last selection across re-entries
 
-### Broadcast input (sync mode)
+### Broadcast input (sync mode) ✓ shipped
 **What:** Type once, keystrokes go to every tab in the sync set. Toggle membership per tab.
 **Why:** THE killer feature for NOC/SRE work — run the same command across N routers at once.
 **Size:** M
 **Open:** Sync-set membership UI — palette-driven "Add tab to sync" or per-tab `^B s` toggle? Sync-on indicator on tabs?
 **Depends on:** nothing.
 
-### Per-session logging
+### Per-session logging ✓ shipped
 **What:** Timestamped log file per host (`~/.config/mterm/logs/<host>/<date>.log`); appended on every byte received.
 **Why:** Change-management evidence; replay; `grep` across yesterday's sessions.
 **Size:** S–M
@@ -107,7 +119,15 @@ delete, rename, multi-select, edit, and view-file.
 **Open:** Browser UX; drag-drop from host terminal; progress bar treatment; zmodem (rz/sz) auto-detection as a follow-on.
 **Depends on:** nothing.
 
-### Mode-aware mouse forwarding
+### Mode-aware mouse forwarding ✓ shipped (wheel only)
+Wheel forwarding shipped: `internal/terminal` tracks DECSET mouse modes via
+xvt's mode callbacks and encodes wheel notches (SGR or X10); `handleMouse`
+forwards them when tracking is on. Follow-ons left on the table:
+- Click + drag forwarding (vim visual-mode drag, lazygit panel clicks)
+- A modifier (e.g. Shift+wheel) to force local scrollback while a remote
+  app has tracking on
+
+Original entry:
 **What:** When the remote app turns on mouse tracking (DECSET `?1000`, `?1002`, `?1003`, `?1006`), forward mouse events — wheel, click, drag — to the remote as encoded SGR (`\x1b[<...M`) or legacy X10 sequences instead of consuming them locally. When tracking is off, keep today's behavior (wheel → mterm scrollback).
 **Why:** Without this, full-screen TUIs run over SSH — opencode, modern vim with `set mouse=a`, htop, ncdu, lazygit — are crippled. Wheel events go to mterm's local scrollback instead of the app the user is looking at. Surfaced during dogfood on opencode-over-SSH.
 **Size:** M
@@ -125,7 +145,7 @@ delete, rename, multi-select, edit, and view-file.
 **Open:** Match pre- or post-ANSI text; compiled at config-load vs lazy; action sandboxing; rate-limiting.
 **Depends on:** per-session logging (for log-to-file action); snippets (for send-snippet action).
 
-### Per-host visual identity
+### Per-host visual identity ✓ shipped
 **What:** `theme:` and/or `border_color:` per host in `hosts.yaml`. Frame and active tab pick up that color.
 **Why:** prod = red, staging = yellow, dev = green. Single biggest "did I just `rm -rf` prod?" prevention.
 **Size:** S
@@ -157,18 +177,19 @@ sync fan-out.
 **Open:** Width policy (fixed cols vs proportional)? Toggle keybinding (`^B b`?) to hide/show? Replace tabstrip entirely or coexist? Per-chip activity indicator (recent output, idle time)?
 **Depends on:** activity/silence indicators (Tier-2) feed naturally into this. Snapshot architecture handles the per-tab body render fine; the chrome refactor is the main lift.
 
-### Workspaces
+### Workspaces ✓ shipped (hostlist-only)
 **What:** `^B w s <name>` saves current tab set; `^B w r <name>` restores. Stored as YAML.
 **Why:** Resume yesterday's investigation in one keystroke.
 **Size:** M
 **Open:** Just hostlist or also pane layout (once splits exist)? Auto-restore on launch?
 **Depends on:** pane splits (for layout-aware saves) — can ship hostlist-only first.
+**Open (v2):** Auto-restore on launch; prefix-key bindings instead of palette-only.
 
-### Activity / silence indicators
+### Activity / silence indicators ✓ shipped
 **What:** Tab chip flashes / badges when a background tab gets new output. Separate badge when output has been silent for N seconds after activity (deploy-done detection).
 **Why:** Long-running deploys; "ping me when this builds."
 **Size:** S
-**Open:** Per-tab opt-in vs always-on; configurable silence threshold.
+**Open (v2):** Configurable silence threshold (hard-coded 30s today); per-tab opt-out.
 **Depends on:** nothing.
 
 ---
@@ -183,14 +204,14 @@ sync fan-out.
 **Depends on:** nothing.
 **Note:** The "forward mouse events to the VT" piece of the original entry has been promoted to Tier 1 as a standalone — see [Mode-aware mouse forwarding](#mode-aware-mouse-forwarding).
 
-### Per-host startup commands
+### Per-host startup commands ✓ shipped
 **What:** `on_connect: ["screen -DR work"]` in `hosts.yaml`; commands sent after handshake.
 **Why:** Auto-attach screen, set environment, `cd` to a working dir.
 **Size:** S
-**Open:** Bundled one-shot vs sequenced with wait-for-prompt.
+**Open (v2):** Sequenced with wait-for-prompt (v1 sends all commands at once).
 **Depends on:** nothing. Doubles as the cheap path to remote-multiplexer detach (see below).
 
-### Connection groups in picker
+### Connection groups in picker ✓ shipped
 **What:** Picker rows grouped by `group:` field in `hosts.yaml`; collapsible group
 headers + viewport scrolling (cursor-visible window, truncation indicators).
 **Why:** 50 routers + 30 servers + 10 dev boxes — flat list becomes unusable; today
@@ -246,24 +267,20 @@ Ship B first as `auto_multiplex: tmux` (per host) for cheap wins; revisit A late
 ## Suggested sequence
 
 Roughly ordered by dependency + effort + bang-for-buck. Each is its own branch.
+Shipped so far: visual identity, picker groups, logging, broadcast input,
+snippets v1, SFTP v1, activity indicators, startup commands, workspaces v1,
+mouse-wheel forwarding.
 
-1. **Per-host visual identity** (S) — tiny diff, big safety, no deps
-2. **Connection groups in picker** (S) — finishes earlier deferred work
-3. **Per-session logging** (S–M) — unblocks trigger "log to file"
-4. **Broadcast input** (M) — the killer feature
-5. **Scrollback search** (M) — improves shipped copy mode
-5a. **Mode-aware mouse forwarding** (M) — unblocks opencode, vim mouse, htop over SSH
-7. **Per-host startup commands** (S) — quick add; enables Architecture B trivially
-8. **Detach/reattach via Architecture B** (M) — `auto_multiplex: tmux` config knob
-9. **Snippets** (M)
-10. **Activity / silence indicators** (S)
-11. **Workspaces** — hostlist-only first (M)
-12. **SFTP file transfer** (L)
-13. **Triggers** (L)
-14. **True color + copy-on-select** (M) — mouse-forwarding split out to Tier 1
-15. **Configurable keymap** (M)
-16. **Pane splitting** (XL)
-17. **Detach/reattach via Architecture A — local daemon** (XL)
+1. **Detach/reattach via Architecture B** (S–M) — `auto_multiplex: tmux`; now
+   a thin layer over `on_connect`
+2. **Snippets reload** (S) — `reloadHosts` re-reads snippets.yaml
+3. **Scrollback search** (M) — improves shipped copy mode
+4. **Mouse click/drag forwarding** (M) — finishes mode-aware mouse
+5. **Triggers** (L)
+6. **True color + copy-on-select** (M)
+7. **Configurable keymap** (M)
+8. **Pane splitting** (XL)
+9. **Detach/reattach via Architecture A — local daemon** (XL)
 
 ---
 
