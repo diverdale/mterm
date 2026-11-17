@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/charmbracelet/x/ansi"
 	xvt "github.com/charmbracelet/x/vt"
 )
 
@@ -16,6 +17,80 @@ type Terminal struct {
 	vt            *xvt.Emulator
 	w, h          int
 	cursorVisible atomic.Bool // tracks DECTCEM (?25h / ?25l); true = visible
+	// mouseModes is a bitmask of the DEC mouse-tracking modes the remote
+	// has enabled (see mouseModeBit). Non-zero means the remote app wants
+	// mouse events. mouseSGR tracks ?1006 (SGR extended encoding).
+	mouseModes atomic.Uint32
+	mouseSGR   atomic.Bool
+}
+
+// mouseTrackingModes are the DECSET modes that ask the terminal to report
+// mouse events: ?9 (X10), ?1000 (normal), ?1001 (highlight), ?1002 (button
+// event), ?1003 (any event).
+var mouseTrackingModes = []ansi.DECMode{
+	ansi.ModeMouseX10,
+	ansi.ModeMouseNormal,
+	ansi.ModeMouseHighlight,
+	ansi.ModeMouseButtonEvent,
+	ansi.ModeMouseAnyEvent,
+}
+
+// mouseModeBit returns the bitmask bit for a tracking mode, or 0 for any
+// other mode.
+func mouseModeBit(m ansi.Mode) uint32 {
+	for i, tm := range mouseTrackingModes {
+		if m == tm {
+			return 1 << i
+		}
+	}
+	return 0
+}
+
+// setMode records a DECSET/DECRST the remote sent. Called from xvt
+// callbacks inside Write (t.mu held) — atomics only, no locking.
+func (t *Terminal) setMode(m ansi.Mode, on bool) {
+	if m == ansi.ModeMouseExtSgr {
+		t.mouseSGR.Store(on)
+		return
+	}
+	bit := mouseModeBit(m)
+	if bit == 0 {
+		return
+	}
+	for {
+		old := t.mouseModes.Load()
+		next := old &^ bit
+		if on {
+			next = old | bit
+		}
+		if t.mouseModes.CompareAndSwap(old, next) {
+			return
+		}
+	}
+}
+
+// MouseTracking reports whether the remote program has enabled mouse
+// reporting (vim with mouse=a, htop, opencode, lazygit, ...).
+func (t *Terminal) MouseTracking() bool { return t.mouseModes.Load() != 0 }
+
+// EncodeWheel returns the bytes to send the remote for one wheel notch at
+// 0-indexed body cell (x, y), in the encoding the remote asked for (SGR
+// when ?1006 is set, legacy X10 otherwise). Returns nil when the remote
+// has not enabled mouse tracking — the caller should then handle the
+// wheel locally (scrollback).
+func (t *Terminal) EncodeWheel(up bool, x, y int) []byte {
+	if !t.MouseTracking() {
+		return nil
+	}
+	btn := ansi.MouseWheelDown
+	if up {
+		btn = ansi.MouseWheelUp
+	}
+	b := ansi.EncodeMouseButton(btn, false, false, false, false)
+	if t.mouseSGR.Load() {
+		return []byte(ansi.MouseSgr(b, x, y, false))
+	}
+	return []byte(ansi.MouseX10(b, x, y))
 }
 
 // New creates a Terminal with the given character dimensions.
@@ -41,6 +116,8 @@ func New(w, h int) *Terminal {
 		CursorVisibility: func(visible bool) {
 			t.cursorVisible.Store(visible)
 		},
+		EnableMode:  func(m ansi.Mode) { t.setMode(m, true) },
+		DisableMode: func(m ansi.Mode) { t.setMode(m, false) },
 	})
 	return t
 }

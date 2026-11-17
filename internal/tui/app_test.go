@@ -1177,3 +1177,55 @@ func TestAppSessionViewIgnoresEmptyBorderColor(t *testing.T) {
 		t.Fatalf("session view contains unexpected color escape %q", notWant)
 	}
 }
+
+func TestAppMouseWheelForwardsToRemoteWhenTrackingOn(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	tab := app.tabs[0]
+	for i := 0; i < 50; i++ {
+		tab.term.Write([]byte("line\r\n"))
+	}
+	// Remote app (vim mouse=a, htop, opencode) turns on SGR mouse tracking.
+	tab.term.Write([]byte("\x1b[?1000h\x1b[?1006h"))
+
+	// Screen (11, 5) is body cell (10, 2): one border column on the left,
+	// top border + tab strip + divider above. SGR coords are 1-based.
+	m := tea.MouseMsg{X: 11, Y: 5, Button: tea.MouseButtonWheelUp, Action: tea.MouseActionPress}
+	if got, want := string(app.wheelInput(m)), "\x1b[<64;11;3M"; got != want {
+		t.Fatalf("wheelInput = %q, want %q", got, want)
+	}
+	app.update(m)
+	if off, _ := tab.scrollPos(); off != 0 {
+		t.Fatalf("forwarded wheel must not scroll local scrollback; offset = %d", off)
+	}
+}
+
+func TestAppMouseWheelOutsideBodyClampsToBodyEdge(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	app.tabs[0].term.Write([]byte("\x1b[?1000h\x1b[?1006h"))
+
+	// Wheel over the tab strip (row 1, col 0) lands on body cell (0, 0).
+	m := tea.MouseMsg{X: 0, Y: 1, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress}
+	if got, want := string(app.wheelInput(m)), "\x1b[<65;1;1M"; got != want {
+		t.Fatalf("wheelInput = %q, want %q", got, want)
+	}
+}
+
+func TestAppMouseWheelNotForwardedWhenTrackingOff(t *testing.T) {
+	app := newTestApp()
+	app.width, app.height = 80, 24
+	app.mode = modeSession
+	app.tabs = []*sessionTab{newSessionTab(1, config.Host{Name: "a"}, 80, 24)}
+	app.active = 0
+	m := tea.MouseMsg{X: 11, Y: 5, Button: tea.MouseButtonWheelUp, Action: tea.MouseActionPress}
+	if got := app.wheelInput(m); got != nil {
+		t.Fatalf("wheelInput with tracking off = %q, want nil", got)
+	}
+}

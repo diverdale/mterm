@@ -467,16 +467,29 @@ func (a *App) handleCommandKey(k tea.KeyMsg) tea.Cmd {
 // to scrolling outside mterm.
 const wheelStep = 3
 
-// handleMouse routes mouse events. Today only wheel-up / wheel-down do
-// anything — they scroll the active session tab's scrollback offset.
-// Clicks and motion are ignored; if a future feature wants them (e.g.
-// mouse passthrough to remote vim) it'll plug in here.
+// bodyOriginX / bodyOriginY are the screen cell where a session's terminal
+// body starts: one left border column; top border, tab strip and tab divider
+// above. Must stay in step with renderWindow and chromeCols/chromeRows.
+const (
+	bodyOriginX = 1
+	bodyOriginY = 3
+)
+
+// handleMouse routes mouse events. Wheel events go to the remote when the
+// remote program has enabled mouse tracking (vim mouse=a, htop, opencode,
+// lazygit); otherwise they scroll the active tab's local scrollback.
+// Clicks and motion are ignored for now.
 func (a *App) handleMouse(m tea.MouseMsg) tea.Cmd {
 	if a.mode != modeSession {
 		return nil
 	}
 	t := a.activeTab()
 	if t == nil {
+		return nil
+	}
+	if p := a.wheelInput(m); p != nil {
+		t.snapToLive()
+		t.sendInput(p)
 		return nil
 	}
 	switch m.Button {
@@ -486,6 +499,43 @@ func (a *App) handleMouse(m tea.MouseMsg) tea.Cmd {
 		t.scrollBy(-wheelStep)
 	}
 	return nil
+}
+
+// wheelInput returns the bytes to forward to the active tab's remote for a
+// wheel event, or nil when the event is not a wheel notch, there is no
+// active session tab, or the remote has not enabled mouse tracking. Screen
+// coordinates are translated to body cells and clamped into the body so a
+// wheel over the frame still reaches the app.
+func (a *App) wheelInput(m tea.MouseMsg) []byte {
+	if a.mode != modeSession {
+		return nil
+	}
+	t := a.activeTab()
+	if t == nil {
+		return nil
+	}
+	var up bool
+	switch m.Button {
+	case tea.MouseButtonWheelUp:
+		up = true
+	case tea.MouseButtonWheelDown:
+	default:
+		return nil
+	}
+	bw, bh := h2body(a.width, a.height)
+	x := clampInt(m.X-bodyOriginX, 0, bw-1)
+	y := clampInt(m.Y-bodyOriginY, 0, bh-1)
+	return t.term.EncodeWheel(up, x, y)
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }
 
 // keyString renders a command key as a comparable string.

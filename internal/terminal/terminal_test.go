@@ -262,3 +262,41 @@ func TestRenderAtShowsScrollback(t *testing.T) {
 type testWriter struct{ t *Terminal }
 
 func (w testWriter) Write(p []byte) (int, error) { return w.t.Write(p) }
+
+func TestWheelEncodingNilWhenMouseTrackingOff(t *testing.T) {
+	term := New(20, 5)
+	if got := term.EncodeWheel(true, 0, 0); got != nil {
+		t.Fatalf("EncodeWheel with tracking off = %q, want nil", got)
+	}
+}
+
+func TestWheelEncodingSGRWhenRemoteEnablesSGRMouse(t *testing.T) {
+	term := New(20, 5)
+	// What vim/htop/opencode send: normal tracking + SGR extended coords.
+	_, _ = term.Write([]byte("\x1b[?1000h\x1b[?1006h"))
+	if got, want := string(term.EncodeWheel(true, 4, 2)), "\x1b[<64;5;3M"; got != want {
+		t.Fatalf("wheel up = %q, want %q", got, want)
+	}
+	if got, want := string(term.EncodeWheel(false, 0, 0)), "\x1b[<65;1;1M"; got != want {
+		t.Fatalf("wheel down = %q, want %q", got, want)
+	}
+}
+
+func TestWheelEncodingX10WithoutSGR(t *testing.T) {
+	term := New(20, 5)
+	_, _ = term.Write([]byte("\x1b[?1002h"))
+	// X10: CSI M, then button+32, x+33, y+33.
+	want := "\x1b[M" + string(rune(64+32)) + string(rune(0+33)) + string(rune(1+33))
+	if got := string(term.EncodeWheel(true, 0, 1)); got != want {
+		t.Fatalf("wheel up X10 = %q, want %q", got, want)
+	}
+}
+
+func TestWheelEncodingStopsWhenRemoteDisablesTracking(t *testing.T) {
+	term := New(20, 5)
+	_, _ = term.Write([]byte("\x1b[?1000h\x1b[?1006h"))
+	_, _ = term.Write([]byte("\x1b[?1000l"))
+	if got := term.EncodeWheel(true, 0, 0); got != nil {
+		t.Fatalf("EncodeWheel after ?1000l = %q, want nil", got)
+	}
+}
